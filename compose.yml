@@ -1,0 +1,142 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-app}
+      POSTGRES_USER: ${DB_USER:-app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-app}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - internal
+      - public
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      target: prod
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8080:3000"
+    networks:
+      - internal
+      - public
+
+  # Optional: run distroless locally to prove it works
+  api-distroless:
+    build:
+      context: .
+      target: prod-distroless
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+        condition: service_healthy
+    ports:
+      - "8081:3000"
+    networks:
+      - internal
+      - public
+    profiles:
+      - distroless
+
+  worker:
+    build:
+      context: .
+      target: prod
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: ["npm", "run", "start:worker"]
+    networks:
+      - internal
+
+  migrate:
+    build:
+      context: .
+      target: prod
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+        condition: service_healthy
+    command: ["node", "dist/database/migrate.js"]
+    networks:
+      - internal
+    profiles:
+      - jobs
+
+  seed:
+    build:
+      context: .
+      target: prod
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["node", "dist/seeds/seed.js"]
+    networks:
+      - internal
+    profiles:
+      - jobs
+
+volumes:
+  pgdata:
+
+networks:
+  internal:
+    internal: true
+  public:

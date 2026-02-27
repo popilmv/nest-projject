@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-app}
+      POSTGRES_USER: ${DB_USER:-app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-app}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+services:
+  api:
+    depends_on:
+      - postgres
+      - rabbitmq
+    build:
+      context: .
+      target: dev
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      # Helps file-watching inside Docker on some systems
+      CHOKIDAR_USEPOLLING: "true"
+    command: npm run start:dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "8080:3000"
+
+  worker:
+    build:
+      context: .
+      target: dev
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
+    command: npm run start:worker
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - rabbitmq
