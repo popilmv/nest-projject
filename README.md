@@ -21,6 +21,9 @@ docker compose up --build
 - API: `http://localhost:8080`
 - RabbitMQ UI: `http://localhost:15672` (guest/guest)
 
+<img width="936" height="960" alt="image" src="https://github.com/user-attachments/assets/401df3c6-c10c-49a3-b903-d2166a06c7ea" />
+
+
 ## Producer (API)
 
 Endpoint:
@@ -166,7 +169,7 @@ Homework notes (schema/resolvers/dataloader + N+1 proof): see **homework07.md**.
 
 ---
 
-# Homework 27: Files (S3 + Presigned URLs)
+# Homework Files (S3 + Presigned URLs)
 
 ## What is implemented
 
