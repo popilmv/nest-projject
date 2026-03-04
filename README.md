@@ -514,3 +514,86 @@ docker-compose exec api id
 
 Distroless has no shell; non-root is guaranteed by the base image defaults.
 (If you need a hard proof, run the `prod` target for `id` and document that `prod-distroless` uses a nonroot distroless base.)
+
+---
+
+# Homework: gRPC Payments microservice
+
+This repo now contains **two runnable NestJS processes**:
+
+1) **orders-service** (existing HTTP API): `src/main.ts`
+2) **payments-service** (new gRPC server): `src/payments-main.ts`
+
+Orders talks to Payments **only via the `.proto` contract** (no direct import of payments-service classes/modules).
+
+## Contract
+
+`proto/payments.proto` is the source of truth for Orders ↔ Payments.
+
+Implemented RPCs:
+
+- `Authorize(order_id, amount_cents, currency, idempotency_key)` → `{ payment_id, status }`
+- `GetPaymentStatus(payment_id)` → `{ payment_id, status }`
+
+`Capture/Refund` are declared as stubs in the contract.
+
+## Environment variables
+
+Copy `.env.example` → `.env`.
+
+Required for this homework:
+
+- `PAYMENTS_GRPC_BIND` — bind address for payments-service (default `0.0.0.0:50051`)
+- `PAYMENTS_GRPC_URL` — address used by orders-service to reach payments-service (default `localhost:50051`)
+- `PAYMENTS_GRPC_TIMEOUT_MS` — gRPC deadline for `Authorize` from orders-service (default `800`)
+
+## How to run locally (2 terminals)
+
+Install deps:
+
+```bash
+npm i
+```
+
+Terminal #1 (Payments gRPC server):
+
+```bash
+npm run start:payments:dev
+```
+
+Terminal #2 (Orders HTTP API):
+
+```bash
+npm run start:dev
+```
+
+## Happy path (end-to-end)
+
+Call Orders create endpoint. Orders will:
+
+1) create the order
+2) call `Payments.Authorize` over gRPC
+3) return `{ order, payment: { payment_id, status } }`
+
+Example:
+
+```bash
+curl -X POST http://localhost:3000/orders \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: test-1' \
+  -d '{
+    "userId": "00000000-0000-0000-0000-000000000001",
+    "items": [
+      {"productId": "<PUT_EXISTING_PRODUCT_ID>", "quantity": 1}
+    ]
+  }'
+```
+
+Expected payment:
+
+- `payment.status = PAYMENT_STATUS_AUTHORIZED`
+
+## Deadline/timeout
+
+Orders sets a real gRPC **deadline** on `Authorize` using `PAYMENTS_GRPC_TIMEOUT_MS`.
+If payments-service is slow/unavailable, the call fails with a gRPC error (e.g. `DEADLINE_EXCEEDED`).

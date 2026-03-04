@@ -7,6 +7,7 @@ import { Order } from './order.entity';
 import { OrderItem } from './order-item.entity';
 import { Product } from '../products/product.entity';
 import { BadRequestError, ConflictError, NotFoundError } from '../../common/errors/http-exception';
+import { PaymentsClient } from '../payments-client/payments.client';
 
 type FindOrdersArgs = {
   filter?: {
@@ -25,6 +26,7 @@ export class OrdersService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly rabbit: RabbitService,
+    private readonly payments: PaymentsClient,
   ) {}
 
   /**
@@ -98,6 +100,13 @@ export class OrdersService {
 
       const byId = new Map(products.map((p) => [p.id, p]));
 
+      // compute total in cents (minimal for homework)
+      const totalCents = dto.items.reduce((sum, it) => {
+        const p = byId.get(it.productId)!;
+        const priceCents = Math.round(Number(p.price) * 100);
+        return sum + priceCents * it.quantity;
+      }, 0);
+
       // 3) create order
       const order = qr.manager.create(Order, {
         userId: dto.userId,
@@ -121,6 +130,16 @@ export class OrdersService {
 
       await qr.commitTransaction();
 
+      // ---- gRPC call: Orders → Payments.Authorize (happy path requirement)
+      // NOTE: Orders knows Payments ONLY via proto contract (no direct code import).
+      const currency = process.env.PAYMENTS_CURRENCY || 'USD';
+      const payment = await this.payments.authorize({
+        orderId: order.id,
+        amountCents: totalCents,
+        currency,
+        idempotencyKey,
+      });
+
       // publish to work queue AFTER commit to avoid 'ack before commit' issues on consumer side
       const messageId = uuidv4();
       const msg: OrdersProcessMessage = {
@@ -134,7 +153,7 @@ export class OrdersService {
       };
       this.rabbit.publishJson(this.rabbit.rkProcess, msg, { messageId, correlationId: msg.correlationId });
 
-      return { reused: false, order, messageId };
+      return { reused: false, order, payment, messageId };
     } catch (e: any) {
       await qr.rollbackTransaction();
       if (e?.code === '23505') {

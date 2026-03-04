@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package payments.v1;
+
+// Minimal contract for Orders ↔ Payments (internal S2S).
+
+service PaymentsService {
+  rpc Authorize (AuthorizeRequest) returns (AuthorizeResponse);
+  rpc GetPaymentStatus (GetPaymentStatusRequest) returns (GetPaymentStatusResponse);
+
+  // Optional stubs (declared for future evolution)
+  rpc Capture (CaptureRequest) returns (CaptureResponse);
+  rpc Refund (RefundRequest) returns (RefundResponse);
+}
+
+message AuthorizeRequest {
+  string order_id = 1;
+  int64 amount_cents = 2;
+  string currency = 3;
+  string idempotency_key = 4; // optional
+}
+
+message AuthorizeResponse {
+  string payment_id = 1;
+  PaymentStatus status = 2;
+}
+
+message GetPaymentStatusRequest {
+  string payment_id = 1;
+}
+
+message GetPaymentStatusResponse {
+  string payment_id = 1;
+  PaymentStatus status = 2;
+}
+
+message CaptureRequest {
+  string payment_id = 1;
+}
+
+message CaptureResponse {
+  string payment_id = 1;
+  PaymentStatus status = 2;
+}
+
+message RefundRequest {
+  string payment_id = 1;
+}
+
+message RefundResponse {
+  string payment_id = 1;
+  PaymentStatus status = 2;
+}
+
+enum PaymentStatus {
+  PAYMENT_STATUS_UNSPECIFIED = 0;
+  PAYMENT_STATUS_PENDING = 1;
+  PAYMENT_STATUS_AUTHORIZED = 2;
+  PAYMENT_STATUS_CAPTURED = 3;
+  PAYMENT_STATUS_FAILED = 4;
+  PAYMENT_STATUS_REFUNDED = 5;
+}
