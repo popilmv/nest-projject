@@ -24,6 +24,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "start:worker": "node -r tsconfig-paths/register -r ts-node/register src/worker.ts",
+    "start:worker:prod": "node dist/worker.js",
     "start:payments": "node dist/payments-main",
     "start:payments:dev": "node -r tsconfig-paths/register -r ts-node/register src/payments-main.ts"
   },
@@ -44,7 +45,7 @@
     "@nestjs/typeorm": "^11.0.0",
     "amqplib": "^0.10.5",
     "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.1",
+    "class-validator": "^0.14.4",
     "dataloader": "^2.2.3",
     "graphql": "^16.9.0",
     "pg": "^8.18.0",

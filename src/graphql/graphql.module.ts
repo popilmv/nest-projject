@@ -16,7 +16,7 @@ import { createProductByIdLoader } from '../loaders/product-by-id.loader';
         path: '/graphql',
         playground: true,
         sortSchema: true,
-        autoSchemaFile: join(process.cwd(), 'schema.gql'),
+        autoSchemaFile: true,
         context: ({ req }) => {
           // IMPORTANT: create loaders per request (batched + cached only within one GraphQL request)
           const productRepo = dataSource.getRepository(Product);

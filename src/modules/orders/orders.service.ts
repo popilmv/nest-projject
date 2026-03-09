@@ -6,8 +6,11 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { Order } from './order.entity';
 import { OrderItem } from './order-item.entity';
 import { Product } from '../products/product.entity';
-import { BadRequestError, ConflictError, NotFoundError } from '../../common/errors/http-exception';
-import { PaymentsClient } from '../payments-client/payments.client';
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from '../../common/errors/http-exception';
 
 type FindOrdersArgs = {
   filter?: {
@@ -26,7 +29,6 @@ export class OrdersService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly rabbit: RabbitService,
-    private readonly payments: PaymentsClient,
   ) {}
 
   /**
@@ -50,24 +52,38 @@ export class OrdersService {
     }
 
     if (args.filter?.dateFrom) {
-      qb.andWhere('o.createdAt >= :dateFrom', { dateFrom: new Date(args.filter.dateFrom) });
+      qb.andWhere('o.createdAt >= :dateFrom', {
+        dateFrom: new Date(args.filter.dateFrom),
+      });
     }
 
     if (args.filter?.dateTo) {
-      qb.andWhere('o.createdAt <= :dateTo', { dateTo: new Date(args.filter.dateTo) });
+      qb.andWhere('o.createdAt <= :dateTo', {
+        dateTo: new Date(args.filter.dateTo),
+      });
     }
 
     return qb.getMany();
   }
 
   async createOrder(dto: CreateOrderDto, idempotencyKey: string) {
-    if (!idempotencyKey) throw new BadRequestError('Idempotency-Key header is required');
+    if (!idempotencyKey) {
+      throw new BadRequestError('Idempotency-Key header is required');
+    }
 
-    if (!dto.userId) throw new BadRequestError('userId is required');
-    if (!dto.items?.length) throw new BadRequestError('items must be a non-empty array');
+    if (!dto.userId) {
+      throw new BadRequestError('userId is required');
+    }
+
+    if (!dto.items?.length) {
+      throw new BadRequestError('items must be a non-empty array');
+    }
 
     for (const it of dto.items) {
-      if (!it.productId) throw new BadRequestError('productId is required', { item: it });
+      if (!it.productId) {
+        throw new BadRequestError('productId is required', { item: it });
+      }
+
       if (!Number.isInteger(it.quantity) || it.quantity <= 0) {
         throw new BadRequestError('quantity must be positive int', { item: it });
       }
@@ -89,9 +105,10 @@ export class OrdersService {
         return { reused: true, order: existing };
       }
 
-      // 2) validate products exist (keep controller/API light; heavy processing is in worker)
+      // 2) validate products exist
       const productIds = dto.items.map((i) => i.productId);
       const products = await qr.manager.findBy(Product, { id: In(productIds) });
+
       if (products.length !== new Set(productIds).size) {
         const found = new Set(products.map((p) => p.id));
         const missing = productIds.filter((id) => !found.has(id));
@@ -100,22 +117,16 @@ export class OrdersService {
 
       const byId = new Map(products.map((p) => [p.id, p]));
 
-      // compute total in cents (minimal for homework)
-      const totalCents = dto.items.reduce((sum, it) => {
-        const p = byId.get(it.productId)!;
-        const priceCents = Math.round(Number(p.price) * 100);
-        return sum + priceCents * it.quantity;
-      }, 0);
-
       // 3) create order
       const order = qr.manager.create(Order, {
         userId: dto.userId,
         idempotencyKey,
         status: 'pending',
       });
+
       await qr.manager.save(order);
 
-      // 5) create items 
+      // 4) create items
       for (const it of dto.items) {
         const p = byId.get(it.productId)!;
 
@@ -125,22 +136,13 @@ export class OrdersService {
           quantity: it.quantity,
           priceAtPurchase: p.price,
         });
+
         await qr.manager.save(item);
       }
 
       await qr.commitTransaction();
 
-      // ---- gRPC call: Orders → Payments.Authorize (happy path requirement)
-      // NOTE: Orders knows Payments ONLY via proto contract (no direct code import).
-      const currency = process.env.PAYMENTS_CURRENCY || 'USD';
-      const payment = await this.payments.authorize({
-        orderId: order.id,
-        amountCents: totalCents,
-        currency,
-        idempotencyKey,
-      });
-
-      // publish to work queue AFTER commit to avoid 'ack before commit' issues on consumer side
+      // 5) publish to RabbitMQ AFTER commit
       const messageId = uuidv4();
       const msg: OrdersProcessMessage = {
         messageId,
@@ -151,16 +153,25 @@ export class OrdersService {
         producer: 'orders-api',
         eventName: 'orders.process',
       };
-      this.rabbit.publishJson(this.rabbit.rkProcess, msg, { messageId, correlationId: msg.correlationId });
 
-      return { reused: false, order, payment, messageId };
+      this.rabbit.publishJson(this.rabbit.rkProcess, msg, {
+        messageId,
+        correlationId: msg.correlationId,
+      });
+
+      return { reused: false, order, messageId };
     } catch (e: any) {
       await qr.rollbackTransaction();
+
       if (e?.code === '23505') {
         const order = await this.dataSource.getRepository(Order).findOne({
           where: { userId: dto.userId, idempotencyKey },
         });
-        if (order) return { reused: true, order };
+
+        if (order) {
+          return { reused: true, order };
+        }
+
         throw new ConflictError('Duplicate idempotency key');
       }
 
@@ -170,4 +181,3 @@ export class OrdersService {
     }
   }
 }
-
