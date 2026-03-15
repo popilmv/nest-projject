@@ -7,7 +7,7 @@ export class ProductModel {
 
   @Field()
   title: string;
-/** price is stored as numeric in DB and returned as string by TypeORM; we expose it as String */
+  /** price is stored as numeric in DB and returned as string by TypeORM; we expose it as String */
   @Field()
   price: string;
 }

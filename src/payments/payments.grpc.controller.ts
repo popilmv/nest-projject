@@ -19,7 +19,10 @@ export class PaymentsGrpcController {
   }
 
   @GrpcMethod('PaymentsService', 'GetPaymentStatus')
-  getPaymentStatus(req: { payment_id: string }): { payment_id: string; status: string } {
+  getPaymentStatus(req: { payment_id: string }): {
+    payment_id: string;
+    status: string;
+  } {
     const rec = this.store.getStatus(req.payment_id);
     if (!rec) {
       // For homework simplicity, return FAILED when not found.

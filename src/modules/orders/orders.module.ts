@@ -12,4 +12,3 @@ import { OrderItemResolver } from './graphql/order-item.resolver';
   providers: [OrdersService, OrdersResolver, OrderItemResolver],
 })
 export class OrdersModule {}
-

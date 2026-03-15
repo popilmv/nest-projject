@@ -1,11 +1,18 @@
 import { Module } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
-import { join } from 'path';
+import { Request } from 'express';
 import { DataSource } from 'typeorm';
 
 import { Product } from '../modules/products/product.entity';
 import { createProductByIdLoader } from '../loaders/product-by-id.loader';
+
+type GraphqlContext = {
+  req: Request;
+  loaders: {
+    productById: ReturnType<typeof createProductByIdLoader>;
+  };
+};
 
 @Module({
   imports: [
@@ -17,8 +24,7 @@ import { createProductByIdLoader } from '../loaders/product-by-id.loader';
         playground: true,
         sortSchema: true,
         autoSchemaFile: true,
-        context: ({ req }) => {
-          // IMPORTANT: create loaders per request (batched + cached only within one GraphQL request)
+        context: ({ req }: { req: Request }): GraphqlContext => {
           const productRepo = dataSource.getRepository(Product);
           return {
             req,

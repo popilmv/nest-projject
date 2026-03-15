@@ -1,6 +1,16 @@
+type PgError = {
+  code?: string;
+};
+
+function isPgError(error: unknown): error is PgError {
+  return typeof error === 'object' && error !== null && 'code' in error;
+}
 import { Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
-import { RabbitService, OrdersProcessMessage } from '../../rabbit/rabbit.service';
+import {
+  RabbitService,
+  OrdersProcessMessage,
+} from '../../rabbit/rabbit.service';
 import { DataSource, In } from 'typeorm';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { Order } from './order.entity';
@@ -85,7 +95,9 @@ export class OrdersService {
       }
 
       if (!Number.isInteger(it.quantity) || it.quantity <= 0) {
-        throw new BadRequestError('quantity must be positive int', { item: it });
+        throw new BadRequestError('quantity must be positive int', {
+          item: it,
+        });
       }
     }
 
@@ -160,10 +172,10 @@ export class OrdersService {
       });
 
       return { reused: false, order, messageId };
-    } catch (e: any) {
+    } catch (e: unknown) {
       await qr.rollbackTransaction();
 
-      if (e?.code === '23505') {
+      if (isPgError(e) && e.code === '23505') {
         const order = await this.dataSource.getRepository(Order).findOne({
           where: { userId: dto.userId, idempotencyKey },
         });

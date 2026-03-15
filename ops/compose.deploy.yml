@@ -1,0 +1,92 @@
+services:
+  orders-api:
+    image: ${ORDERS_API_IMAGE}
+    env_file:
+      - ${ENV_FILE}
+    environment:
+      PORT: 3000
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      PAYMENTS_GRPC_URL: ${PAYMENTS_GRPC_URL:-payments:50051}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    depends_on:
+      - postgres
+      - rabbitmq
+      - payments
+    ports:
+      - '${API_PORT:-8080}:3000'
+    restart: unless-stopped
+
+  payments:
+    image: ${PAYMENTS_IMAGE}
+    env_file:
+      - ${ENV_FILE}
+    environment:
+      PAYMENTS_GRPC_BIND: 0.0.0.0:50051
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    command: ['node', 'dist/payments-main.js']
+    depends_on:
+      - postgres
+      - rabbitmq
+    restart: unless-stopped
+
+  worker:
+    image: ${WORKER_IMAGE}
+    env_file:
+      - ${ENV_FILE}
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    command: ['node', 'dist/worker.js']
+    depends_on:
+      - postgres
+      - rabbitmq
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - '${RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    image: ${ORDERS_API_IMAGE}
+    env_file:
+      - ${ENV_FILE}
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    command: ['node', 'dist/database/migrate.js']
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    name: ${COMPOSE_PROJECT_NAME}_pgdata

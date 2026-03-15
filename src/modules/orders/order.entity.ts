@@ -1,4 +1,12 @@
-import { Column, CreateDateColumn, Entity, Index, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { User } from '../users/user.entity';
 import { OrderItem } from './order-item.entity';
 
@@ -6,7 +14,7 @@ export type OrderStatus = 'pending' | 'processed' | 'failed';
 
 @Entity('orders')
 @Index(['userId', 'idempotencyKey'], { unique: true })
-@Index(['status', 'createdAt']) // 
+@Index(['status', 'createdAt']) //
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -32,4 +40,3 @@ export class Order {
   @OneToMany(() => OrderItem, (i) => i.order, { cascade: false })
   items: OrderItem[];
 }
-

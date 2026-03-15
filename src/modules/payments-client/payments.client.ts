@@ -24,7 +24,6 @@ type AuthorizeResponse = {
   status: PaymentStatus;
 };
 
-// We keep it minimal for homework: only the methods we need.
 type PaymentsServiceClient = {
   Authorize(
     req: AuthorizeRequest,
@@ -34,12 +33,24 @@ type PaymentsServiceClient = {
   ): void;
 };
 
+type PaymentsGrpcPackage = {
+  payments: {
+    v1: {
+      PaymentsService: new (
+        address: string,
+        credentials: grpc.ChannelCredentials,
+      ) => PaymentsServiceClient;
+    };
+  };
+};
+
 @Injectable()
 export class PaymentsClient {
   private client: PaymentsServiceClient;
 
   constructor(private readonly config: ConfigService) {
-    const url = this.config.get<string>('PAYMENTS_GRPC_URL') || 'localhost:50051';
+    const url =
+      this.config.get<string>('PAYMENTS_GRPC_URL') || 'localhost:50051';
 
     const protoPath = join(process.cwd(), 'proto/payments.proto');
     const pkgDef = protoLoader.loadSync(protoPath, {
@@ -50,10 +61,15 @@ export class PaymentsClient {
       oneofs: true,
     });
 
-    const grpcObj: any = grpc.loadPackageDefinition(pkgDef);
+    const grpcObj = grpc.loadPackageDefinition(
+      pkgDef,
+    ) as unknown as PaymentsGrpcPackage;
     const paymentsV1 = grpcObj.payments.v1;
 
-    this.client = new paymentsV1.PaymentsService(url, grpc.credentials.createInsecure());
+    this.client = new paymentsV1.PaymentsService(
+      url,
+      grpc.credentials.createInsecure(),
+    );
   }
 
   async authorize(input: {
@@ -62,7 +78,9 @@ export class PaymentsClient {
     currency: string;
     idempotencyKey?: string;
   }): Promise<AuthorizeResponse> {
-    const timeoutMs = Number(this.config.get<string>('PAYMENTS_GRPC_TIMEOUT_MS') || '800');
+    const timeoutMs = Number(
+      this.config.get<string>('PAYMENTS_GRPC_TIMEOUT_MS') || '800',
+    );
     const deadline = new Date(Date.now() + timeoutMs);
 
     const req: AuthorizeRequest = {
@@ -73,15 +91,10 @@ export class PaymentsClient {
     };
 
     return await new Promise<AuthorizeResponse>((resolve, reject) => {
-      this.client.Authorize(
-        req,
-        undefined,
-        { deadline },
-        (err, res) => {
-          if (err) return reject(err);
-          resolve(res!);
-        },
-      );
+      this.client.Authorize(req, undefined, { deadline }, (err, res) => {
+        if (err) return reject(err);
+        resolve(res as AuthorizeResponse);
+      });
     });
   }
 }

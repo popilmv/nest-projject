@@ -600,3 +600,255 @@ Expected payment:
 
 Orders sets a real gRPC **deadline** on `Authorize` using `PAYMENTS_GRPC_TIMEOUT_MS`.
 If payments-service is slow/unavailable, the call fails with a gRPC error (e.g. `DEADLINE_EXCEEDED`).
+
+
+---
+
+# Homework: CI/CD pipeline (GitHub Actions + GHCR + Docker Compose)
+
+## What was added
+
+- `pr-checks.yml` for pull requests into `develop` and `main`
+- `build-and-stage.yml` for immutable Docker build, GHCR push, `release-manifest.json`, and automatic deploy to `stage`
+- `deploy-prod.yml` for manual production deployment with GitHub Environment approval
+- `ops/compose.deploy.yml` for real runtime deployment of:
+  - `orders-api`
+  - `payments`
+  - `worker`
+- `scripts/deploy.sh` and `scripts/smoke-check.sh`
+- `/health` and `/ready` endpoints for post-deploy verification
+
+## Git strategy
+
+Recommended branch model for the homework:
+
+- `feature/*` -> open PR into `develop`
+- `develop` -> auto build + auto deploy to `stage`
+- `main` -> protected stable branch for approved releases
+- optional: `release/*`, `hotfix/*`
+
+`pr-checks.yml` is the required gate for PRs into `develop` and `main`.
+
+To fully block merges, configure branch protection in GitHub:
+
+- require status checks to pass before merging
+- mark `pr-checks / quality-gates` as required
+- protect `main` and `develop`
+
+## Workflow overview
+
+### 1) PR checks
+
+File: `.github/workflows/pr-checks.yml`
+
+Runs on pull requests to `develop` and `main`.
+
+Checks:
+
+- `npm ci`
+- lint
+- unit tests
+- `npm run build`
+- Docker build validation (`docker build --target prod ...`)
+
+This gives both classic code quality checks and one extra release-oriented gate.
+
+### 2) Build + stage deploy
+
+File: `.github/workflows/build-and-stage.yml`
+
+Runs automatically on push to `develop`.
+
+What it does:
+
+1. builds production Docker image
+2. pushes image to GHCR
+3. uses immutable tag: `sha-<commit>`
+4. stores `release-manifest.json`
+5. deploys the same image to `stage`
+6. runs smoke checks against `/health` and `/ready`
+
+Example image reference:
+
+```text
+ghcr.io/<owner>/<repo>:sha-<commit>
+```
+
+Example release manifest:
+
+```json
+{
+  "commit": "<sha>",
+  "imageTag": "sha-<commit>",
+  "services": {
+    "orders-api": {
+      "image": "ghcr.io/<owner>/<repo>:sha-<commit>",
+      "digest": "sha256:..."
+    },
+    "payments": {
+      "image": "ghcr.io/<owner>/<repo>:sha-<commit>",
+      "digest": "sha256:..."
+    },
+    "worker": {
+      "image": "ghcr.io/<owner>/<repo>:sha-<commit>",
+      "digest": "sha256:..."
+    }
+  }
+}
+```
+
+### 3) Production deploy
+
+File: `.github/workflows/deploy-prod.yml`
+
+Runs manually through `workflow_dispatch`.
+
+Requirements implemented:
+
+- GitHub Environment: `production`
+- manual approval is handled by environment protection rules
+- `concurrency` blocks parallel production deploys
+- production deploy uses the exact immutable image tag from stage
+- production workflow does **not** rebuild Docker image
+
+Manual inputs:
+
+- `image_tag`
+- `commit_sha`
+- `image_digest` (optional, for audit trail)
+
+## Deployment target
+
+This solution uses the allowed deployment style:
+
+- **GitHub Actions**
+- **GHCR** as registry
+- **self-hosted runner + Docker Compose** as runtime target
+- separate stage/prod deployments via different project names and environment secrets
+
+The real deploy is done through:
+
+- `ops/compose.deploy.yml`
+- `scripts/deploy.sh`
+
+That means stage/prod deployment is not a fake `echo deploy done`; it actually:
+
+1. pulls immutable images
+2. starts infrastructure (`postgres`, `rabbitmq`)
+3. runs migrations
+4. starts `orders-api`, `payments`, and `worker`
+5. verifies `/health` and `/ready`
+
+## Required GitHub Environments
+
+Create two environments in repository settings:
+
+- `stage`
+- `production`
+
+Recommended:
+
+- `stage` -> no manual approval
+- `production` -> required reviewers enabled
+
+## Required secrets
+
+### Shared
+
+- `AWS_REGION`
+- `S3_BUCKET`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+
+### Stage
+
+- `STAGE_APP_URL`
+- `STAGE_API_PORT`
+- `STAGE_DB_NAME`
+- `STAGE_DB_USER`
+- `STAGE_DB_PASSWORD`
+- `STAGE_DB_HOST`
+- `STAGE_DB_PORT`
+- `STAGE_RABBITMQ_URL`
+- `STAGE_RABBITMQ_MANAGEMENT_PORT`
+
+### Production
+
+- `PROD_APP_URL`
+- `PROD_API_PORT`
+- `PROD_DB_NAME`
+- `PROD_DB_USER`
+- `PROD_DB_PASSWORD`
+- `PROD_DB_HOST`
+- `PROD_DB_PORT`
+- `PROD_RABBITMQ_URL`
+- `PROD_RABBITMQ_MANAGEMENT_PORT`
+
+No secrets are committed into the repository.
+
+## Self-hosted runner expectations
+
+The stage/prod runner should have:
+
+- Docker Engine
+- Docker Compose v2
+- network access to GHCR
+- enough disk space for images/volumes
+
+Recommended labels:
+
+- `self-hosted`
+- `linux`
+- `x64`
+
+## Health checks used by pipeline
+
+Added endpoints:
+
+- `GET /health`
+- `GET /ready`
+
+`/ready` also checks database connectivity with `SELECT 1`.
+
+## End-to-end release flow
+
+1. create branch `feature/...`
+2. open PR into `develop`
+3. PR workflow runs quality gates
+4. merge into `develop`
+5. `build-and-stage.yml` builds image and deploys to `stage`
+6. copy immutable tag from logs or release manifest, for example:
+   - `sha-2f1c...`
+7. start `deploy-prod.yml`
+8. enter:
+   - `image_tag=sha-...`
+   - `commit_sha=<full sha>`
+   - `image_digest=sha256:...` (optional)
+9. approve deployment in protected `production` environment
+10. production runner deploys the exact same artifact
+
+## Why this satisfies the homework
+
+- PR pipeline exists
+- lint exists
+- unit tests exist
+- extra gate exists: Docker build validation
+- Docker artifact is built and pushed to registry
+- immutable tag is used
+- stage environment is used
+- stage deploy is real
+- smoke check exists after deploy
+- production environment is used
+- manual approval is expected through environment protection
+- production deploy uses the same artifact tag
+- production deploy does not rebuild the image
+- parallel production deploys are blocked with `concurrency`
+
+## What to screenshot for submission
+
+Take 2-4 screenshots:
+
+1. successful PR checks
+2. successful build + stage deploy
+3. production approval screen
+4. successful production deploy

@@ -45,11 +45,12 @@ export class FilesService {
   }
 
   private buildKey(dto: PresignFileDto): string {
-    const ext = dto.contentType === 'image/jpeg'
-      ? 'jpg'
-      : dto.contentType === 'image/png'
-        ? 'png'
-        : 'webp';
+    const ext =
+      dto.contentType === 'image/jpeg'
+        ? 'jpg'
+        : dto.contentType === 'image/png'
+          ? 'png'
+          : 'webp';
 
     const fileUuid = uuidv4();
 
@@ -125,7 +126,10 @@ export class FilesService {
 
     // Domain integration (Product image)
     if (file.entityType === 'product') {
-      await this.productsRepo.update({ id: file.entityId }, { imageFileId: file.id });
+      await this.productsRepo.update(
+        { id: file.entityId },
+        { imageFileId: file.id },
+      );
     }
 
     return { ok: true };
@@ -140,14 +144,19 @@ export class FilesService {
     }
 
     // Authorization on backend
-    if (file.visibility === FileVisibility.Private && file.ownerId !== user.id) {
+    if (
+      file.visibility === FileVisibility.Private &&
+      file.ownerId !== user.id
+    ) {
       throw new ForbiddenException('No access to this file');
     }
 
     // Public delivery: CloudFront (preferred) or S3 URL
     if (file.visibility === FileVisibility.Public) {
       if (this.cloudfrontBaseUrl) {
-        return { url: `${this.cloudfrontBaseUrl.replace(/\/$/, '')}/${file.key}` };
+        return {
+          url: `${this.cloudfrontBaseUrl.replace(/\/$/, '')}/${file.key}`,
+        };
       }
       return {
         url: `https://${file.bucket}.s3.${this.config.get<string>('AWS_REGION')}.amazonaws.com/${file.key}`,
