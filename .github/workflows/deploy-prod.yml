@@ -1,0 +1,87 @@
+name: deploy-prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Immutable image tag from a successful stage build (for example sha-<commit>)
+        required: true
+        type: string
+      commit_sha:
+        description: Commit SHA linked to the release
+        required: true
+        type: string
+      image_digest:
+        description: Optional image digest for audit trail
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_REPOSITORY: ${{ github.repository }}
+
+jobs:
+  deploy-production:
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ secrets.PROD_APP_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log release metadata
+        shell: bash
+        run: |
+          echo "environment=production"
+          echo "commit_sha=${{ inputs.commit_sha }}"
+          echo "image_tag=${{ inputs.image_tag }}"
+          echo "image_digest=${{ inputs.image_digest }}"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write production env file
+        shell: bash
+        run: |
+          cat > .env.production <<EOF
+          NODE_ENV=production
+          DB_NAME=${{ secrets.PROD_DB_NAME }}
+          DB_USER=${{ secrets.PROD_DB_USER }}
+          DB_PASSWORD=${{ secrets.PROD_DB_PASSWORD }}
+          DB_HOST=${{ secrets.PROD_DB_HOST }}
+          DB_PORT=${{ secrets.PROD_DB_PORT }}
+          RABBITMQ_URL=${{ secrets.PROD_RABBITMQ_URL }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          S3_BUCKET=${{ secrets.S3_BUCKET }}
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOF
+
+      - name: Deploy to production without rebuild
+        env:
+          COMPOSE_PROJECT_NAME: orders-production
+          ENV_FILE: .env.production
+          APP_URL: ${{ secrets.PROD_APP_URL }}
+          DB_HOST: ${{ secrets.PROD_DB_HOST }}
+          DB_PORT: ${{ secrets.PROD_DB_PORT }}
+          API_PORT: ${{ secrets.PROD_API_PORT }}
+          RABBITMQ_URL: ${{ secrets.PROD_RABBITMQ_URL }}
+          RABBITMQ_MANAGEMENT_PORT: ${{ secrets.PROD_RABBITMQ_MANAGEMENT_PORT }}
+          ORDERS_API_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:${{ inputs.image_tag }}
+          PAYMENTS_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:${{ inputs.image_tag }}
+          WORKER_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:${{ inputs.image_tag }}
+        run: ./scripts/deploy.sh production

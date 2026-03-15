@@ -23,7 +23,8 @@ import { FileRecord } from './modules/files/entities/file-record.entity';
       username: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      ssl:
+        process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
       entities: [User, Product, Order, OrderItem, ProcessedMessage, FileRecord],
       synchronize: true,
       logging: ['query'],
@@ -36,4 +37,3 @@ import { FileRecord } from './modules/files/entities/file-record.entity';
   ],
 })
 export class AppModule {}
-

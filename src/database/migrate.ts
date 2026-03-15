@@ -28,7 +28,9 @@ async function run() {
       return;
     } catch (e) {
       lastErr = e;
-      console.warn(`Migrate attempt ${attempt}/${maxAttempts} failed. Retrying in ${delayMs}ms...`);
+      console.warn(
+        `Migrate attempt ${attempt}/${maxAttempts} failed. Retrying in ${delayMs}ms...`,
+      );
       await sleep(delayMs);
     }
   }

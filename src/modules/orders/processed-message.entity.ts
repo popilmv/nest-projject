@@ -1,4 +1,10 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryColumn,
+} from 'typeorm';
 
 @Entity('processed_messages')
 @Index(['messageId'], { unique: true })

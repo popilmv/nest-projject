@@ -12,4 +12,3 @@ export class User {
   @OneToMany(() => Order, (o) => o.user)
   orders: Order[];
 }
-

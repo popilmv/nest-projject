@@ -5,7 +5,21 @@ import { RabbitService, OrdersProcessMessage } from '../rabbit/rabbit.service';
 import { ProcessedMessage } from '../modules/orders/processed-message.entity';
 import { Order } from '../modules/orders/order.entity';
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type PgError = { code?: string };
+
+function isPgError(error: unknown): error is PgError {
+  return typeof error === 'object' && error !== null && 'code' in error;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
 
 @Injectable()
 export class OrdersWorker implements OnModuleInit {
@@ -19,29 +33,37 @@ export class OrdersWorker implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.rabbit.consume(this.rabbit.processQueue, (msg) => this.handle(msg));
-    this.logger.log(`Consuming ${this.rabbit.processQueue} (maxAttempts=${this.maxAttempts})`);
+    await this.rabbit.consume(this.rabbit.processQueue, (msg) =>
+      this.handle(msg),
+    );
+    this.logger.log(
+      `Consuming ${this.rabbit.processQueue} (maxAttempts=${this.maxAttempts})`,
+    );
   }
 
   private parse(msg: amqp.ConsumeMessage): OrdersProcessMessage {
     const raw = msg.content.toString('utf-8');
-    return JSON.parse(raw);
+    return JSON.parse(raw) as OrdersProcessMessage;
   }
 
-  private async handle(msg: amqp.ConsumeMessage) {
+  private async handle(msg: amqp.ConsumeMessage): Promise<void> {
     const chAck = () => this.rabbit.ack(msg);
     const payload = this.parse(msg);
 
     const { messageId, orderId, attempt } = payload;
 
-    const logBase = { messageId, orderId, attempt, redelivered: msg.fields.redelivered };
+    const logBase = {
+      messageId,
+      orderId,
+      attempt,
+      redelivered: msg.fields.redelivered,
+    };
 
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
     await qr.startTransaction();
 
     try {
-      // Idempotency guard
       const pm = qr.manager.create(ProcessedMessage, {
         messageId,
         orderId,
@@ -50,7 +72,6 @@ export class OrdersWorker implements OnModuleInit {
 
       await qr.manager.insert(ProcessedMessage, pm);
 
-      // Load + lock order
       const order = await qr.manager
         .createQueryBuilder(Order, 'o')
         .where('o.id = :id', { id: orderId })
@@ -58,21 +79,22 @@ export class OrdersWorker implements OnModuleInit {
         .getOne();
 
       if (!order) {
-        // Permanent failure: order missing
         throw new Error(`Order not found: ${orderId}`);
       }
 
       if (order.status === 'processed') {
         await qr.commitTransaction();
-        this.logger.log({ ...logBase, result: 'success', note: 'already processed' } as any);
+        this.logger.log({
+          ...logBase,
+          result: 'success',
+          note: 'already processed',
+        });
         chAck();
         return;
       }
 
-      // Simulate heavy work / external call
       await sleep(200 + Math.floor(Math.random() * 300));
 
-      // Demo knob: force failures to test retry/DLQ
       const failProb = Number(process.env.ORDERS_FAIL_PROB ?? 0);
       if (failProb > 0 && Math.random() < failProb) {
         throw new Error('Simulated worker failure (ORDERS_FAIL_PROB)');
@@ -83,22 +105,24 @@ export class OrdersWorker implements OnModuleInit {
       await qr.manager.save(order);
 
       await qr.commitTransaction();
-      this.logger.log({ ...logBase, result: 'success' } as any);
+      this.logger.log({ ...logBase, result: 'success' });
       chAck();
-    } catch (e: any) {
-      // If messageId already processed → ack and exit (idempotent)
-      if (e?.code === '23505') {
+    } catch (error: unknown) {
+      if (isPgError(error) && error.code === '23505') {
         await qr.rollbackTransaction();
-        this.logger.warn({ ...logBase, result: 'success', note: 'duplicate messageId' } as any);
+        this.logger.warn({
+          ...logBase,
+          result: 'success',
+          note: 'duplicate messageId',
+        });
         chAck();
         return;
       }
 
       await qr.rollbackTransaction();
 
-      const reason = e?.message || String(e);
+      const reason = getErrorMessage(error);
 
-      // Controlled retry via retry queue (TTL -> DLX back to process)
       if (attempt < this.maxAttempts) {
         const next: OrdersProcessMessage = { ...payload, attempt: attempt + 1 };
         this.rabbit.publishJson(this.rabbit.rkRetry, next, {
@@ -106,17 +130,16 @@ export class OrdersWorker implements OnModuleInit {
           correlationId: payload.correlationId ?? payload.messageId,
         });
 
-        this.logger.warn({ ...logBase, result: 'retry', reason } as any);
-        chAck(); // ack original after republish
+        this.logger.warn({ ...logBase, result: 'retry', reason });
+        chAck();
         return;
       }
 
-      // DLQ
       this.rabbit.publishJson(this.rabbit.rkDlq, payload, {
         messageId: payload.messageId,
         correlationId: payload.correlationId ?? payload.messageId,
       });
-      this.logger.error({ ...logBase, result: 'dlq', reason } as any);
+      this.logger.error({ ...logBase, result: 'dlq', reason });
       chAck();
     } finally {
       await qr.release();

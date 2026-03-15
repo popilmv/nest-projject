@@ -18,4 +18,3 @@ export class Product {
   @Column({ type: 'uuid', nullable: true })
   imageFileId: string | null;
 }
-
