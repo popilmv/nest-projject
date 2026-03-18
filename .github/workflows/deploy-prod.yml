@@ -34,7 +34,6 @@ jobs:
     timeout-minutes: 30
     environment:
       name: production
-      url: ${{ secrets.PROD_APP_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
