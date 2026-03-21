@@ -574,9 +574,10 @@ npm run start:dev
 
 Call Orders create endpoint. Orders will:
 
-1) create the order
-2) call `Payments.Authorize` over gRPC
-3) return `{ order, payment: { payment_id, status } }`
+1) create the order in the orders DB
+2) call `Payments.Authorize` over gRPC using `PaymentsClient`
+3) persist `paymentId/paymentStatus` on the order
+4) return `{ reused, order, payment, messageId }`
 
 Example:
 
@@ -592,14 +593,36 @@ curl -X POST http://localhost:3000/orders \
   }'
 ```
 
-Expected payment:
+Expected response fragment:
 
-- `payment.status = PAYMENT_STATUS_AUTHORIZED`
+```json
+{
+  "reused": false,
+  "order": {
+    "id": "<order-id>",
+    "status": "pending",
+    "paymentId": "<payment-id>",
+    "paymentStatus": "PAYMENT_STATUS_AUTHORIZED"
+  },
+  "payment": {
+    "payment_id": "<payment-id>",
+    "status": "PAYMENT_STATUS_AUTHORIZED"
+  },
+  "messageId": "<message-id>"
+}
+```
+
+Repeat the same request with the same `Idempotency-Key` and the API returns the existing order with the same stored payment information (`reused: true`).
 
 ## Deadline/timeout
 
 Orders sets a real gRPC **deadline** on `Authorize` using `PAYMENTS_GRPC_TIMEOUT_MS`.
-If payments-service is slow/unavailable, the call fails with a gRPC error (e.g. `DEADLINE_EXCEEDED`).
+If payments-service is slow/unavailable, Orders maps the transport error to a controlled HTTP error:
+
+- `504 GATEWAY_TIMEOUT` for `DEADLINE_EXCEEDED`
+- `503 SERVICE_UNAVAILABLE` for unavailable/other RPC failures
+
+This prevents raw gRPC transport leakage in the public HTTP API.
 
 
 ---

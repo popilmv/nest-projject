@@ -7,6 +7,7 @@ function isPgError(error: unknown): error is PgError {
 }
 import { Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
+import * as grpc from '@grpc/grpc-js';
 import {
   RabbitService,
   OrdersProcessMessage,
@@ -19,8 +20,11 @@ import { Product } from '../products/product.entity';
 import {
   BadRequestError,
   ConflictError,
+  GatewayTimeoutError,
   NotFoundError,
+  ServiceUnavailableError,
 } from '../../common/errors/http-exception';
+import { PaymentsClient } from '../payments-client/payments.client';
 
 type FindOrdersArgs = {
   filter?: {
@@ -39,6 +43,7 @@ export class OrdersService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly rabbit: RabbitService,
+    private readonly paymentsClient: PaymentsClient,
   ) {}
 
   /**
@@ -114,7 +119,17 @@ export class OrdersService {
 
       if (existing) {
         await qr.commitTransaction();
-        return { reused: true, order: existing };
+        return {
+          reused: true,
+          order: existing,
+          payment:
+            existing.paymentId && existing.paymentStatus
+              ? {
+                  payment_id: existing.paymentId,
+                  status: existing.paymentStatus,
+                }
+              : null,
+        };
       }
 
       // 2) validate products exist
@@ -128,6 +143,10 @@ export class OrdersService {
       }
 
       const byId = new Map(products.map((p) => [p.id, p]));
+      const amountCents = dto.items.reduce((sum, it) => {
+        const p = byId.get(it.productId)!;
+        return sum + Number(p.price) * it.quantity;
+      }, 0);
 
       // 3) create order
       const order = qr.manager.create(Order, {
@@ -154,7 +173,30 @@ export class OrdersService {
 
       await qr.commitTransaction();
 
-      // 5) publish to RabbitMQ AFTER commit
+      let payment: { payment_id: string; status: string };
+      try {
+        payment = await this.paymentsClient.authorize({
+          orderId: order.id,
+          amountCents,
+          currency: 'USD',
+          idempotencyKey,
+        });
+      } catch (error: unknown) {
+        await this.dataSource.getRepository(Order).update(order.id, {
+          status: 'failed',
+        });
+        this.handlePaymentsRpcError(error);
+      }
+
+      await this.dataSource.getRepository(Order).update(order.id, {
+        paymentId: payment.payment_id,
+        paymentStatus: payment.status,
+      });
+
+      order.paymentId = payment.payment_id;
+      order.paymentStatus = payment.status;
+
+      // 5) publish to RabbitMQ AFTER commit + successful payment auth
       const messageId = uuidv4();
       const msg: OrdersProcessMessage = {
         messageId,
@@ -171,7 +213,7 @@ export class OrdersService {
         correlationId: msg.correlationId,
       });
 
-      return { reused: false, order, messageId };
+      return { reused: false, order, payment, messageId };
     } catch (e: unknown) {
       await qr.rollbackTransaction();
 
@@ -181,7 +223,17 @@ export class OrdersService {
         });
 
         if (order) {
-          return { reused: true, order };
+          return {
+            reused: true,
+            order,
+            payment:
+              order.paymentId && order.paymentStatus
+                ? {
+                    payment_id: order.paymentId,
+                    status: order.paymentStatus,
+                  }
+                : null,
+          };
         }
 
         throw new ConflictError('Duplicate idempotency key');
@@ -191,5 +243,36 @@ export class OrdersService {
     } finally {
       await qr.release();
     }
+  }
+
+  private handlePaymentsRpcError(error: unknown): never {
+    if (this.isGrpcServiceError(error)) {
+      if (error.code === grpc.status.DEADLINE_EXCEEDED) {
+        throw new GatewayTimeoutError('Payments authorization timed out', {
+          service: 'payments',
+          transport: 'grpc',
+        });
+      }
+
+      throw new ServiceUnavailableError('Payments authorization failed', {
+        service: 'payments',
+        transport: 'grpc',
+        rpcCode: error.code,
+      });
+    }
+
+    throw new ServiceUnavailableError('Payments authorization failed', {
+      service: 'payments',
+      transport: 'grpc',
+    });
+  }
+
+  private isGrpcServiceError(error: unknown): error is grpc.ServiceError {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof (error as { code?: unknown }).code === 'number'
+    );
   }
 }
