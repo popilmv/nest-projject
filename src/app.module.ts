@@ -1,4 +1,9 @@
-import { Module } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -11,6 +16,11 @@ import { OrderItem } from './modules/orders/order-item.entity';
 import { ProcessedMessage } from './modules/orders/processed-message.entity';
 import { FilesModule } from './modules/files/files.module';
 import { FileRecord } from './modules/files/entities/file-record.entity';
+import { RequestIdMiddleware } from './common/request/request-id.middleware';
+import { DefaultRateLimitMiddleware } from './common/security/default-rate-limit.middleware';
+import { StrictRateLimitMiddleware } from './common/security/strict-rate-limit.middleware';
+import { SecurityHeadersMiddleware } from './common/security/security-headers.middleware';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -27,13 +37,35 @@ import { FileRecord } from './modules/files/entities/file-record.entity';
         process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
       entities: [User, Product, Order, OrderItem, ProcessedMessage, FileRecord],
       synchronize: true,
-      logging: ['query'],
+      logging: process.env.DB_LOG_QUERIES === 'true' ? ['query', 'error'] : ['error'],
     }),
 
+    CommonModule,
     RabbitModule,
     OrdersModule,
     FilesModule,
     AppGraphqlModule,
   ],
+  providers: [
+    RequestIdMiddleware,
+    SecurityHeadersMiddleware,
+    DefaultRateLimitMiddleware,
+    StrictRateLimitMiddleware,
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(RequestIdMiddleware, SecurityHeadersMiddleware, DefaultRateLimitMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+
+    consumer
+      .apply(StrictRateLimitMiddleware)
+      .forRoutes(
+        { path: 'orders', method: RequestMethod.POST },
+        { path: 'files/presign', method: RequestMethod.POST },
+        { path: 'files/complete', method: RequestMethod.POST },
+        { path: 'graphql', method: RequestMethod.ALL },
+      );
+  }
+}

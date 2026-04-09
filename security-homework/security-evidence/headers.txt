@@ -1,0 +1,28 @@
+# How to verify security headers
+
+Run:
+
+curl -i http://localhost:8080/orders \
+  -H 'x-user-id: 00000000-0000-0000-0000-000000000001'
+
+Look for headers like:
+- x-request-id
+- x-correlation-id
+- x-content-type-options: nosniff
+- x-frame-options: DENY
+- referrer-policy: no-referrer
+- permissions-policy: camera=(), microphone=(), geolocation=()
+- x-permitted-cross-domain-policies: none
+- cross-origin-resource-policy: same-origin
+- ratelimit-policy
+- ratelimit-limit
+- ratelimit-remaining
+
+Optional HTTPS/HSTS check behind proxy:
+
+curl -i http://localhost:8080/orders \
+  -H 'x-user-id: 00000000-0000-0000-0000-000000000001' \
+  -H 'x-forwarded-proto: https'
+
+If `ENABLE_HSTS=true`, response should also include:
+- strict-transport-security

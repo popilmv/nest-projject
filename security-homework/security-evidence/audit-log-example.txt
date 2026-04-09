@@ -1,0 +1,48 @@
+# How to verify audit logging
+
+Run the app and watch logs:
+
+docker compose logs -f api
+# or
+npm run start:dev
+
+Trigger these examples:
+
+1) Missing auth header:
+curl -i http://localhost:8080/files/some-id
+
+Expected audit action:
+- auth.missing_user_header
+
+2) Invalid role header:
+curl -i http://localhost:8080/files/some-id \
+  -H 'x-user-id: 00000000-0000-0000-0000-000000000001' \
+  -H 'x-user-role: superadmin'
+
+Expected audit action:
+- auth.invalid_role_header
+
+3) Sensitive write route:
+curl -i -X POST http://localhost:8080/files/presign \
+  -H 'Content-Type: application/json' \
+  -H 'x-user-id: 00000000-0000-0000-0000-000000000001' \
+  -H 'x-user-role: admin' \
+  -d '{"entityType":"product","entityId":"11111111-1111-1111-1111-111111111111","contentType":"image/png","size":5,"visibility":"public"}'
+
+Expected audit action:
+- files.presign.succeeded or files.presign.failed
+
+Audit event shape:
+{
+  "timestamp": "...",
+  "action": "files.presign.succeeded",
+  "actorId": "...",
+  "actorRole": "admin",
+  "targetType": "product",
+  "targetId": "...",
+  "outcome": "success",
+  "requestId": "...",
+  "correlationId": "...",
+  "ip": "...",
+  "userAgent": "..."
+}

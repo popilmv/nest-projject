@@ -5,6 +5,7 @@ import { Product } from '../modules/products/product.entity';
 import { Order } from '../modules/orders/order.entity';
 import { OrderItem } from '../modules/orders/order-item.entity';
 import { ProcessedMessage } from '../modules/orders/processed-message.entity';
+import { FileRecord } from '../modules/files/entities/file-record.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -14,5 +15,6 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   synchronize: true,
-  entities: [User, Product, Order, OrderItem, ProcessedMessage],
+  logging: process.env.DB_LOG_QUERIES === 'true' ? ['query', 'error'] : ['error'],
+  entities: [User, Product, Order, OrderItem, ProcessedMessage, FileRecord],
 });

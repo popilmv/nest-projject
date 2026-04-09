@@ -21,7 +21,7 @@ type GraphqlContext = {
       inject: [DataSource],
       useFactory: (dataSource: DataSource) => ({
         path: '/graphql',
-        playground: true,
+        playground: process.env.NODE_ENV !== 'production',
         sortSchema: true,
         autoSchemaFile: true,
         context: ({ req }: { req: Request }): GraphqlContext => {

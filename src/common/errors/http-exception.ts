@@ -26,15 +26,3 @@ export class NotFoundError extends HttpException {
     super(404, 'NOT_FOUND', message, details);
   }
 }
-
-export class ServiceUnavailableError extends HttpException {
-  constructor(message: string, details?: unknown) {
-    super(503, 'SERVICE_UNAVAILABLE', message, details);
-  }
-}
-
-export class GatewayTimeoutError extends HttpException {
-  constructor(message: string, details?: unknown) {
-    super(504, 'GATEWAY_TIMEOUT', message, details);
-  }
-}

@@ -302,12 +302,14 @@ npm run seed
 <img width="474" height="195" alt="image" src="https://github.com/user-attachments/assets/4226256d-5336-435e-b655-6281d398211b" />
 
 ## Transactional createOrder
+> Security note: `POST /orders` now requires the DEV auth header. The authenticated principal is used as the real order owner.
+
 ```
 curl -i \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: test-key-1" \
+  -H "x-user-id: e74c8128-ec97-40ab-bc1c-7f420d541a2c" \
   -d "{
-    \"userId\":\"e74c8128-ec97-40ab-bc1c-7f420d541a2c\",
     \"items\":[{\"productId\":\"b6106263-a610-4dc8-9be6-74f42a87ed4d\",\"quantity\":1}]
   }" \
   http://localhost:3000/orders
@@ -574,10 +576,9 @@ npm run start:dev
 
 Call Orders create endpoint. Orders will:
 
-1) create the order in the orders DB
-2) call `Payments.Authorize` over gRPC using `PaymentsClient`
-3) persist `paymentId/paymentStatus` on the order
-4) return `{ reused, order, payment, messageId }`
+1) create the order
+2) call `Payments.Authorize` over gRPC
+3) return `{ order, payment: { payment_id, status } }`
 
 Example:
 
@@ -593,36 +594,14 @@ curl -X POST http://localhost:3000/orders \
   }'
 ```
 
-Expected response fragment:
+Expected payment:
 
-```json
-{
-  "reused": false,
-  "order": {
-    "id": "<order-id>",
-    "status": "pending",
-    "paymentId": "<payment-id>",
-    "paymentStatus": "PAYMENT_STATUS_AUTHORIZED"
-  },
-  "payment": {
-    "payment_id": "<payment-id>",
-    "status": "PAYMENT_STATUS_AUTHORIZED"
-  },
-  "messageId": "<message-id>"
-}
-```
-
-Repeat the same request with the same `Idempotency-Key` and the API returns the existing order with the same stored payment information (`reused: true`).
+- `payment.status = PAYMENT_STATUS_AUTHORIZED`
 
 ## Deadline/timeout
 
 Orders sets a real gRPC **deadline** on `Authorize` using `PAYMENTS_GRPC_TIMEOUT_MS`.
-If payments-service is slow/unavailable, Orders maps the transport error to a controlled HTTP error:
-
-- `504 GATEWAY_TIMEOUT` for `DEADLINE_EXCEEDED`
-- `503 SERVICE_UNAVAILABLE` for unavailable/other RPC failures
-
-This prevents raw gRPC transport leakage in the public HTTP API.
+If payments-service is slow/unavailable, the call fails with a gRPC error (e.g. `DEADLINE_EXCEEDED`).
 
 
 ---
@@ -875,3 +854,73 @@ Take 2-4 screenshots:
 2. successful build + stage deploy
 3. production approval screen
 4. successful production deploy
+
+---
+
+## Security hardening baseline
+
+This repo now includes a minimal security baseline for the riskiest surfaces.
+
+### What changed
+- `trust proxy` enabled so client IP / proxied HTTPS posture are interpreted correctly
+- validation tightened with `forbidNonWhitelisted: true`
+- security headers baseline added via middleware
+- request and correlation ids are attached to every response
+- two rate-limit modes are active:
+  - **default** for general API traffic
+  - **strict** for sensitive routes (`POST /orders`, `POST /files/presign`, `POST /files/complete`, `/graphql`)
+- structured audit logging added for critical events
+- GraphQL playground disabled in production
+- DB query logging is disabled by default unless `DB_LOG_QUERIES=true`
+
+### Critical events currently audited
+- suspicious auth events (`auth.missing_user_header`, `auth.invalid_role_header`)
+- order creation (`orders.create.accepted`, `orders.create.reused`, `orders.create.failed`)
+- file write/read flows (`files.presign.*`, `files.complete.*`, `files.read_url.*`)
+- rate-limit denials (`abuse.rate_limit_exceeded`)
+
+### Verification quick checks
+#### 1) Headers
+```bash
+curl -i http://localhost:8080/orders   -H 'x-user-id: 00000000-0000-0000-0000-000000000001'
+```
+Check for:
+- `x-request-id`
+- `x-correlation-id`
+- `x-content-type-options: nosniff`
+- `x-frame-options: DENY`
+- `referrer-policy: no-referrer`
+- `ratelimit-policy`
+- `ratelimit-limit`
+- `ratelimit-remaining`
+
+#### 2) Strict rate limit
+```bash
+for i in $(seq 1 12); do
+  curl -s -o /dev/null -w '%{http_code}
+'     -X POST http://localhost:8080/orders     -H 'Content-Type: application/json'     -H 'Idempotency-Key: demo-key-'"$i"     -H 'x-user-id: 00000000-0000-0000-0000-000000000001'     -d '{"items":[{"productId":"11111111-1111-1111-1111-111111111111","quantity":1}]}'
+done
+```
+Expected: after the strict budget is exhausted you get `429`.
+
+#### 3) Audit logging
+```bash
+docker compose logs -f api
+```
+In another shell trigger:
+```bash
+curl -i http://localhost:8080/files/some-id
+```
+Expected audit event: `auth.missing_user_header`
+
+### Security homework deliverables
+See:
+- `security-homework/SECURITY-BASELINE.md`
+- `security-homework/secret-flow-note.md`
+- `security-homework/tls-note.md`
+- `security-homework/security-evidence/*`
+
+### Notes
+- DEV auth via `x-user-id` / `x-user-role` is still only a training setup.
+- Production target state should replace this with JWT/session auth, centralized secret delivery, and edge TLS termination.
+
