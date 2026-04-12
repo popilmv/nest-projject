@@ -59,17 +59,15 @@ CMD ["node", "dist/main.js"]
 ############################
 # prod-distroless: minimal runtime (no shell)
 ############################
-FROM gcr.io/distroless/nodejs20-debian12 AS prod-distroless
-WORKDIR /app
+FROM gcr.io/distroless/nodejs20-debian12:nonroot AS prod-distroless
 
+WORKDIR /app
 ENV NODE_ENV=production
 
-# Distroless Node image has entrypoint "node" already.
-# It also runs as nonroot by default.
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/proto ./proto
+COPY --from=build --chown=65532:65532 /app/dist ./dist
+COPY --from=build --chown=65532:65532 /app/node_modules ./node_modules
+COPY --from=build --chown=65532:65532 /app/package.json ./package.json
+COPY --from=build --chown=65532:65532 /app/proto ./proto
 
 EXPOSE 3000
 CMD ["dist/main.js"]
