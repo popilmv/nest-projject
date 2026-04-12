@@ -1,39 +1,37 @@
 import { Module } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
-import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
-import { Request } from 'express';
+import { ApolloDriver } from '@nestjs/apollo';
+import { join } from 'path';
 import { DataSource } from 'typeorm';
 
 import { Product } from '../modules/products/product.entity';
 import { createProductByIdLoader } from '../loaders/product-by-id.loader';
 
-type GraphqlContext = {
-  req: Request;
-  loaders: {
-    productById: ReturnType<typeof createProductByIdLoader>;
-  };
-};
-
 @Module({
   imports: [
-    GraphQLModule.forRootAsync<ApolloDriverConfig>({
+    GraphQLModule.forRootAsync({
       driver: ApolloDriver,
       inject: [DataSource],
-      useFactory: (dataSource: DataSource) => ({
-        path: '/graphql',
-        playground: process.env.NODE_ENV !== 'production',
-        sortSchema: true,
-        autoSchemaFile: true,
-        context: ({ req }: { req: Request }): GraphqlContext => {
-          const productRepo = dataSource.getRepository(Product);
-          return {
-            req,
-            loaders: {
-              productById: createProductByIdLoader(productRepo),
-            },
-          };
-        },
-      }),
+      useFactory: (dataSource: DataSource) => {
+        const isProd = process.env.NODE_ENV === 'production';
+
+        return {
+          path: '/graphql',
+          playground: !isProd,
+          sortSchema: true,
+          autoSchemaFile: isProd ? true : join(process.cwd(), 'schema.gql'),
+          context: ({ req }: { req: any }) => {
+            const productRepo = dataSource.getRepository(Product);
+
+            return {
+              req,
+              loaders: {
+                productById: createProductByIdLoader(productRepo),
+              },
+            };
+          },
+        };
+      },
     }),
   ],
 })
