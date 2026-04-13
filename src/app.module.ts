@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -35,5 +37,7 @@ import { FileRecord } from './modules/files/entities/file-record.entity';
     FilesModule,
     AppGraphqlModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
