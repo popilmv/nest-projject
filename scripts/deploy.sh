@@ -15,22 +15,32 @@ fi
 : "${APP_URL:?APP_URL is required}"
 
 COMPOSE_FILE="ops/compose.deploy.yml"
+ENV_FILE="$(realpath "$ENV_FILE")"
 
 echo "Deploying environment=$ENVIRONMENT"
 echo "project=$COMPOSE_PROJECT_NAME"
+echo "env_file=$ENV_FILE"
 echo "orders_api_image=$ORDERS_API_IMAGE"
 echo "payments_image=$PAYMENTS_IMAGE"
 echo "worker_image=$WORKER_IMAGE"
 
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" pull
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" up -d postgres rabbitmq
+compose() {
+  docker compose \
+    --env-file "$ENV_FILE" \
+    -p "$COMPOSE_PROJECT_NAME" \
+    -f "$COMPOSE_FILE" \
+    "$@"
+}
+
+compose pull
+compose up -d postgres rabbitmq
 
 echo "Running database migrations"
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" run --rm migrate
+compose run --rm migrate
 
 echo "Starting application workloads"
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" up -d orders-api payments worker
+compose up -d orders-api payments worker
 
 ./scripts/smoke-check.sh "$APP_URL"
 
-docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" ps
+compose ps
