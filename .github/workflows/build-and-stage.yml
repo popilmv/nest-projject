@@ -102,27 +102,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Write stage env file
-        shell: bash
-        run: |
-          cat > .env.stage <<EOF
-          NODE_ENV=production
-          DB_NAME=${{ secrets.STAGE_DB_NAME }}
-          DB_USER=${{ secrets.STAGE_DB_USER }}
-          DB_PASSWORD=${{ secrets.STAGE_DB_PASSWORD }}
-          DB_HOST=${{ secrets.STAGE_DB_HOST }}
-          DB_PORT=${{ secrets.STAGE_DB_PORT }}
-          RABBITMQ_URL=${{ secrets.STAGE_RABBITMQ_URL }}
-          AWS_REGION=${{ secrets.AWS_REGION }}
-          S3_BUCKET=${{ secrets.S3_BUCKET }}
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          EOF
+      # - name: Write stage env file
+      #   shell: bash
+      #   run: |
+      #     cat > .env.stage <<EOF
+      #     NODE_ENV=production
+      #     DB_NAME=${{ secrets.STAGE_DB_NAME }}
+      #     DB_USER=${{ secrets.STAGE_DB_USER }}
+      #     DB_PASSWORD=${{ secrets.STAGE_DB_PASSWORD }}
+      #     DB_HOST=${{ secrets.STAGE_DB_HOST }}
+      #     DB_PORT=${{ secrets.STAGE_DB_PORT }}
+      #     RABBITMQ_URL=${{ secrets.STAGE_RABBITMQ_URL }}
+      #     AWS_REGION=${{ secrets.AWS_REGION }}
+      #     S3_BUCKET=${{ secrets.S3_BUCKET }}
+      #     AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     EOF
 
       - name: Deploy to stage
         env:
           COMPOSE_PROJECT_NAME: orders-stage
-          ENV_FILE: .env.stage
+          ENV_FILE: ${{ github.workspace }}/.env.stage
           APP_URL: ${{ secrets.STAGE_APP_URL }}
           DB_HOST: ${{ secrets.STAGE_DB_HOST }}
           DB_PORT: ${{ secrets.STAGE_DB_PORT }}
