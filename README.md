@@ -868,10 +868,16 @@ Added endpoints:
 - parallel production deploys are blocked with `concurrency`
 
 ## What to screenshot for submission
+screenshots:
 
-Take 2-4 screenshots:
+1. successful PR checks https://github.com/popilmv/nest-projject/actions/runs/24392056145/job/71240349357
+<img width="792" height="687" alt="image" src="https://github.com/user-attachments/assets/d8081d77-7637-46da-aa7b-778777b2ee04" />
 
-1. successful PR checks
-2. successful build + stage deploy
+2. successful build + stage deploy https://github.com/popilmv/nest-projject/actions/runs/24393565444
+<img width="1239" height="768" alt="image" src="https://github.com/user-attachments/assets/dc62cf19-be7d-402e-80cd-bc05114baadf" />
+
 3. production approval screen
-4. successful production deploy
+<img width="1487" height="568" alt="image" src="https://github.com/user-attachments/assets/83260664-a873-42e7-8481-f60e264b62fe" />
+ 
+4. successful production deploy https://github.com/popilmv/nest-projject/actions/runs/24397122507 <img width="1430" height="590" alt="image" src="https://github.com/user-attachments/assets/aed90e26-3d42-4ff3-86f7-21dc76750fda" />
+
