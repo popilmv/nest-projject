@@ -102,33 +102,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # - name: Write stage env file
-      #   shell: bash
-      #   run: |
-      #     cat > .env.stage <<EOF
-      #     NODE_ENV=production
-      #     DB_NAME=${{ secrets.STAGE_DB_NAME }}
-      #     DB_USER=${{ secrets.STAGE_DB_USER }}
-      #     DB_PASSWORD=${{ secrets.STAGE_DB_PASSWORD }}
-      #     DB_HOST=${{ secrets.STAGE_DB_HOST }}
-      #     DB_PORT=${{ secrets.STAGE_DB_PORT }}
-      #     RABBITMQ_URL=${{ secrets.STAGE_RABBITMQ_URL }}
-      #     AWS_REGION=${{ secrets.AWS_REGION }}
-      #     S3_BUCKET=${{ secrets.S3_BUCKET }}
-      #     AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     EOF
+      - name: Write stage env file
+        shell: bash
+        run: |
+          cat > "$GITHUB_WORKSPACE/.env.stage" <<EOF
+          NODE_ENV=${{ vars.NODE_ENV || 'stage' }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_HOST=${{ vars.DB_HOST || 'postgres' }}
+          DB_PORT=${{ vars.DB_PORT || '5432' }}
+          RABBITMQ_URL=${{ vars.RABBITMQ_URL || 'amqp://guest:guest@rabbitmq:5672' }}
+          AWS_REGION=${{ vars.AWS_REGION }}
+          S3_BUCKET=${{ vars.S3_BUCKET }}
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOF
 
       - name: Deploy to stage
         env:
           COMPOSE_PROJECT_NAME: orders-stage
           ENV_FILE: ${{ github.workspace }}/.env.stage
-          APP_URL: ${{ secrets.STAGE_APP_URL }}
-          DB_HOST: ${{ secrets.STAGE_DB_HOST }}
-          DB_PORT: ${{ secrets.STAGE_DB_PORT }}
-          API_PORT: ${{ secrets.STAGE_API_PORT }}
-          RABBITMQ_URL: ${{ secrets.STAGE_RABBITMQ_URL }}
-          RABBITMQ_MANAGEMENT_PORT: ${{ secrets.STAGE_RABBITMQ_MANAGEMENT_PORT }}
+          APP_URL: ${{ vars.APP_URL || 'http://localhost:18080' }}
+          DB_HOST: ${{ vars.DB_HOST || 'postgres' }}
+          DB_PORT: ${{ vars.DB_PORT || '5432' }}
+          API_PORT: ${{ vars.API_PORT || '18080' }}
+          RABBITMQ_URL: ${{ vars.RABBITMQ_URL || 'amqp://guest:guest@rabbitmq:5672' }}
+          RABBITMQ_MANAGEMENT_PORT: ${{ vars.RABBITMQ_MANAGEMENT_PORT || '15672' }}
           ORDERS_API_IMAGE: ${{ needs.build-artifact.outputs.image_ref }}
           PAYMENTS_IMAGE: ${{ needs.build-artifact.outputs.image_ref }}
           WORKER_IMAGE: ${{ needs.build-artifact.outputs.image_ref }}
