@@ -14,7 +14,7 @@ export type OrderStatus = 'pending' | 'processed' | 'failed';
 
 @Entity('orders')
 @Index(['userId', 'idempotencyKey'], { unique: true })
-@Index(['status', 'createdAt']) //
+@Index(['status', 'createdAt'])
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -30,6 +30,12 @@ export class Order {
 
   @Column({ type: 'text', default: 'pending' })
   status: OrderStatus;
+
+  @Column({ type: 'text', nullable: true })
+  paymentId?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  paymentStatus?: string | null;
 
   @CreateDateColumn()
   createdAt: Date;
