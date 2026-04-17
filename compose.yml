@@ -30,6 +30,8 @@ services:
       retries: 20
 
   api:
+    mem_limit: 256m
+    cpus: 0.50
     build:
       context: .
       target: prod
@@ -73,6 +75,8 @@ services:
       - distroless
 
   worker:
+    mem_limit: 256m
+    cpus: 0.50  
     build:
       context: .
       target: prod
@@ -129,6 +133,8 @@ services:
     profiles:
       - jobs
   payments:
+    mem_limit: 128m
+    cpus: 0.25  
     build:
       context: .
       target: prod
