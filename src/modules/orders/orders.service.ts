@@ -145,7 +145,7 @@ export class OrdersService {
       const byId = new Map(products.map((p) => [p.id, p]));
       const amountCents = dto.items.reduce((sum, it) => {
         const p = byId.get(it.productId)!;
-        return sum + Number(p.price) * it.quantity;
+        return sum + Math.round(Number(p.price) * 100) * it.quantity;
       }, 0);
 
       // 3) create order
@@ -157,19 +157,24 @@ export class OrdersService {
 
       await qr.manager.save(order);
 
-      // 4) create items
-      for (const it of dto.items) {
+      // 4) create items with one batch insert to reduce DB round-trips
+      const itemRows = dto.items.map((it) => {
         const p = byId.get(it.productId)!;
 
-        const item = qr.manager.create(OrderItem, {
+        return {
           orderId: order.id,
           productId: p.id,
           quantity: it.quantity,
           priceAtPurchase: p.price,
-        });
+        };
+      });
 
-        await qr.manager.save(item);
-      }
+      await qr.manager
+        .createQueryBuilder()
+        .insert()
+        .into(OrderItem)
+        .values(itemRows)
+        .execute();
 
       await qr.commitTransaction();
 
@@ -215,7 +220,9 @@ export class OrdersService {
 
       return { reused: false, order, payment, messageId };
     } catch (e: unknown) {
-      await qr.rollbackTransaction();
+      if (qr.isTransactionActive) {
+        await qr.rollbackTransaction();
+      }
 
       if (isPgError(e) && e.code === '23505') {
         const order = await this.dataSource.getRepository(Order).findOne({

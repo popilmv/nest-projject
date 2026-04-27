@@ -1,0 +1,80 @@
+Fri Apr 17 11:08:22 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     60.31MiB / 14.97GiB   0.39%     232kB / 137kB     28.2MB / 2.79MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.43MiB / 14.97GiB   0.26%     44.1kB / 126B     29.1MB / 3.93MB   18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.41MiB / 14.97GiB   0.27%     47.1kB / 16.3kB   8.96MB / 4.03MB   22
+Fri Apr 17 11:08:26 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     60.27MiB / 14.97GiB   0.39%     232kB / 137kB     28.2MB / 2.79MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.4MiB / 14.97GiB    0.26%     44.1kB / 126B     29.1MB / 3.93MB   18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.38MiB / 14.97GiB   0.27%     47.1kB / 16.3kB   8.96MB / 4.03MB   22
+Fri Apr 17 11:08:30 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     60.18MiB / 14.97GiB   0.39%     232kB / 137kB     28.2MB / 2.85MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.34MiB / 14.97GiB   0.26%     44.2kB / 126B     29.1MB / 3.95MB   18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.33MiB / 14.97GiB   0.27%     47.1kB / 16.3kB   8.96MB / 4.08MB   22
+Fri Apr 17 11:08:34 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     60.18MiB / 14.97GiB   0.39%     234kB / 138kB     28.2MB / 2.85MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.34MiB / 14.97GiB   0.26%     44.2kB / 126B     29.1MB / 3.95MB   18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.33MiB / 14.97GiB   0.27%     47.2kB / 16.3kB   8.96MB / 4.08MB   22
+Fri Apr 17 11:08:38 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     60.18MiB / 14.97GiB   0.39%     234kB / 139kB     28.2MB / 2.85MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.34MiB / 14.97GiB   0.26%     44.2kB / 126B     29.1MB / 3.95MB   18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.33MiB / 14.97GiB   0.27%     47.2kB / 16.3kB   8.96MB / 4.08MB   22
+Fri Apr 17 11:08:42 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     60.03MiB / 14.97GiB   0.39%     234kB / 139kB     28.2MB / 3.01MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.26MiB / 14.97GiB   0.26%     44.2kB / 126B     29.1MB / 3.98MB   18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.27MiB / 14.97GiB   0.27%     47.3kB / 16.4kB   8.96MB / 4.13MB   22
+Fri Apr 17 11:08:46 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     60.03MiB / 14.97GiB   0.39%     235kB / 140kB     28.2MB / 3.01MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.26MiB / 14.97GiB   0.26%     44.2kB / 126B     29.1MB / 3.98MB   18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.27MiB / 14.97GiB   0.27%     47.3kB / 16.4kB   8.96MB / 4.13MB   22
+Fri Apr 17 11:08:50 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     59.95MiB / 14.97GiB   0.39%     235kB / 140kB     28.2MB / 3.08MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.23MiB / 14.97GiB   0.26%     44.2kB / 126B     29.1MB / 3.99MB   18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.2MiB / 14.97GiB    0.27%     47.3kB / 16.4kB   8.96MB / 4.18MB   22
+Fri Apr 17 11:08:54 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     59.95MiB / 14.97GiB   0.39%     235kB / 140kB     28.2MB / 3.08MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.23MiB / 14.97GiB   0.26%     44.2kB / 126B     29.1MB / 3.99MB   18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.2MiB / 14.97GiB    0.27%     47.3kB / 16.4kB   8.96MB / 4.18MB   22
+Fri Apr 17 11:08:59 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     59.78MiB / 14.97GiB   0.39%     235kB / 140kB     28.2MB / 3.19MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.21MiB / 14.97GiB   0.26%     44.2kB / 126B     29.1MB / 4MB      18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.14MiB / 14.97GiB   0.27%     47.3kB / 16.4kB   8.96MB / 4.22MB   22
+Fri Apr 17 11:09:03 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     59.72MiB / 14.97GiB   0.39%     237kB / 141kB     28.2MB / 3.24MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.21MiB / 14.97GiB   0.26%     44.3kB / 126B     29.1MB / 4MB      18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.12MiB / 14.97GiB   0.27%     47.4kB / 16.4kB   8.96MB / 4.22MB   22
+Fri Apr 17 11:09:07 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     59.68MiB / 14.97GiB   0.39%     237kB / 142kB     28.2MB / 3.29MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.21MiB / 14.97GiB   0.26%     44.3kB / 126B     29.1MB / 4MB      18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.12MiB / 14.97GiB   0.27%     47.5kB / 16.5kB   8.96MB / 4.22MB   22
+Fri Apr 17 11:09:11 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     59.68MiB / 14.97GiB   0.39%     239kB / 142kB     28.2MB / 3.29MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.21MiB / 14.97GiB   0.26%     45.1kB / 126B     29.1MB / 4MB      18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.11MiB / 14.97GiB   0.27%     48.2kB / 16.6kB   8.96MB / 4.22MB   22
+Fri Apr 17 11:09:15 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     59.68MiB / 14.97GiB   0.39%     239kB / 142kB     28.2MB / 3.29MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.21MiB / 14.97GiB   0.26%     45.1kB / 126B     29.1MB / 4MB      18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.11MiB / 14.97GiB   0.27%     48.4kB / 16.6kB   8.96MB / 4.22MB   22
+Fri Apr 17 11:09:19 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     59.68MiB / 14.97GiB   0.39%     240kB / 143kB     28.2MB / 3.29MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.21MiB / 14.97GiB   0.26%     45.1kB / 126B     29.1MB / 4MB      18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.11MiB / 14.97GiB   0.27%     48.4kB / 16.6kB   8.96MB / 4.22MB   22
+Fri Apr 17 11:09:23 PM EEST 2026
+CONTAINER ID   NAME                       CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+0736fc6b3499   nest-projject-api-1        0.00%     59.68MiB / 14.97GiB   0.39%     240kB / 143kB     28.2MB / 3.29MB   11
+907958a1a583   nest-projject-payments-1   0.00%     40.21MiB / 14.97GiB   0.26%     45.1kB / 126B     29.1MB / 4MB      18
+d661b91d86c5   nest-projject-worker-1     0.00%     41.11MiB / 14.97GiB   0.27%     48.4kB / 16.6kB   8.96MB / 4.22MB   22

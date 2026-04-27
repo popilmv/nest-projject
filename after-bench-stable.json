@@ -1,0 +1,18 @@
+{
+  "totalRequests": 20,
+  "concurrency": 1,
+  "itemsPerOrder": 2,
+  "requestTimeoutMs": 30000,
+  "throughputRps": 0.03,
+  "errorRatePct": 100,
+  "p50Ms": 30001.11,
+  "p95Ms": 30002.2,
+  "p99Ms": 30010.22,
+  "minMs": 30000.36,
+  "maxMs": 30010.22,
+  "successCount": 0,
+  "failureCount": 20,
+  "statusCounts": {
+    "408": 20
+  }
+}
