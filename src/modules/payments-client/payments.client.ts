@@ -27,7 +27,6 @@ type AuthorizeResponse = {
 type PaymentsServiceClient = {
   Authorize(
     req: AuthorizeRequest,
-    meta: grpc.Metadata | undefined,
     options: grpc.CallOptions,
     cb: (err: grpc.ServiceError | null, res?: AuthorizeResponse) => void,
   ): void;
@@ -91,7 +90,7 @@ export class PaymentsClient {
     };
 
     return await new Promise<AuthorizeResponse>((resolve, reject) => {
-      this.client.Authorize(req, undefined, { deadline }, (err, res) => {
+      this.client.Authorize(req, { deadline }, (err, res) => {
         if (err) return reject(err);
         resolve(res as AuthorizeResponse);
       });

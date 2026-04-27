@@ -108,9 +108,12 @@ export class OrdersService {
 
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
-    await qr.startTransaction();
+
+    let txCommitted = false;
 
     try {
+      await qr.startTransaction();
+
       // 1) idempotency
       const existing = await qr.manager.findOne(Order, {
         where: { userId: dto.userId, idempotencyKey },
@@ -119,6 +122,8 @@ export class OrdersService {
 
       if (existing) {
         await qr.commitTransaction();
+        txCommitted = true;
+
         return {
           reused: true,
           order: existing,
@@ -172,6 +177,7 @@ export class OrdersService {
       }
 
       await qr.commitTransaction();
+      txCommitted = true;
 
       let payment: { payment_id: string; status: string };
       try {
@@ -215,7 +221,9 @@ export class OrdersService {
 
       return { reused: false, order, payment, messageId };
     } catch (e: unknown) {
-      await qr.rollbackTransaction();
+      if (!txCommitted) {
+        await qr.rollbackTransaction();
+      }
 
       if (isPgError(e) && e.code === '23505') {
         const order = await this.dataSource.getRepository(Order).findOne({
