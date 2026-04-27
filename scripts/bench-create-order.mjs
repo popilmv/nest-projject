@@ -7,6 +7,7 @@ const PRODUCT_IDS = (process.env.PRODUCT_IDS || '').split(',').filter(Boolean);
 const ITEMS_PER_ORDER = Number(process.env.ITEMS_PER_ORDER || 20);
 const TOTAL_REQUESTS = Number(process.env.TOTAL_REQUESTS || 200);
 const CONCURRENCY = Number(process.env.CONCURRENCY || 20);
+const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 10000);
 
 if (!USER_ID) {
   throw new Error('USER_ID is required');
@@ -16,6 +17,7 @@ if (PRODUCT_IDS.length === 0) {
 }
 
 function percentile(sorted, p) {
+  if (sorted.length === 0) return 0;
   const idx = Math.ceil((p / 100) * sorted.length) - 1;
   return sorted[Math.max(0, idx)];
 }
@@ -34,21 +36,38 @@ function buildBody() {
 
 async function sendOne() {
   const started = performance.now();
-  const res = await fetch(URL, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'idempotency-key': randomUUID(),
-    },
-    body: buildBody(),
-  });
-  const ended = performance.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  return {
-    ms: ended - started,
-    ok: res.ok,
-    status: res.status,
-  };
+  try {
+    const res = await fetch(URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      body: buildBody(),
+      signal: controller.signal,
+    });
+
+    const ended = performance.now();
+
+    return {
+      ms: ended - started,
+      ok: res.ok,
+      status: res.status,
+    };
+  } catch (err) {
+    const ended = performance.now();
+
+    return {
+      ms: ended - started,
+      ok: false,
+      status: err?.name === 'AbortError' ? 408 : 0,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function main() {
@@ -77,6 +96,7 @@ async function main() {
           .finally(() => {
             inFlight--;
             completed++;
+
             if (completed === TOTAL_REQUESTS) {
               resolve();
             } else {
@@ -90,11 +110,11 @@ async function main() {
   });
 
   const globalEnd = performance.now();
-  const totalSec = (globalEnd - globalStart) / 1000;
+  const totalSec = Math.max((globalEnd - globalStart) / 1000, 0.001);
 
   const durations = results
     .map((r) => r.ms)
-    .filter((x) => x > 0)
+    .filter((x) => Number.isFinite(x) && x > 0)
     .sort((a, b) => a - b);
 
   const errors = results.filter((r) => !r.ok).length;
@@ -103,13 +123,16 @@ async function main() {
     totalRequests: TOTAL_REQUESTS,
     concurrency: CONCURRENCY,
     itemsPerOrder: ITEMS_PER_ORDER,
+    requestTimeoutMs: REQUEST_TIMEOUT_MS,
     throughputRps: Number((TOTAL_REQUESTS / totalSec).toFixed(2)),
     errorRatePct: Number(((errors / TOTAL_REQUESTS) * 100).toFixed(2)),
     p50Ms: Number(percentile(durations, 50).toFixed(2)),
     p95Ms: Number(percentile(durations, 95).toFixed(2)),
     p99Ms: Number(percentile(durations, 99).toFixed(2)),
-    minMs: Number(durations[0].toFixed(2)),
-    maxMs: Number(durations[durations.length - 1].toFixed(2)),
+    minMs: Number((durations[0] ?? 0).toFixed(2)),
+    maxMs: Number((durations[durations.length - 1] ?? 0).toFixed(2)),
+    successCount: results.filter((r) => r.ok).length,
+    failureCount: errors,
     statusCounts: results.reduce((acc, r) => {
       acc[r.status] = (acc[r.status] || 0) + 1;
       return acc;
