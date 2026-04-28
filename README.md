@@ -849,80 +849,16 @@ Added endpoints and registered them in `AppModule` through `AppController`:
 - parallel production deploys are blocked with `concurrency`
 
 ## What to screenshot for submission
+screenshots:
 
-Take 2-4 screenshots:
+1. successful PR checks https://github.com/popilmv/nest-projject/actions/runs/24392056145/job/71240349357
+<img width="792" height="687" alt="image" src="https://github.com/user-attachments/assets/d8081d77-7637-46da-aa7b-778777b2ee04" />
 
-1. successful PR checks
-2. successful build + stage deploy
+2. successful build + stage deploy https://github.com/popilmv/nest-projject/actions/runs/24393565444
+<img width="1239" height="768" alt="image" src="https://github.com/user-attachments/assets/dc62cf19-be7d-402e-80cd-bc05114baadf" />
+
 3. production approval screen
-4. successful production deploy
-
----
-
-## Security hardening baseline
-
-This repo now includes a minimal security baseline for the riskiest surfaces.
-
-### What changed
-- `trust proxy` enabled so client IP / proxied HTTPS posture are interpreted correctly
-- validation tightened with `forbidNonWhitelisted: true`
-- security headers baseline added via middleware
-- request and correlation ids are attached to every response
-- two rate-limit modes are active:
-  - **default** for general API traffic
-  - **strict** for sensitive routes (`POST /orders`, `POST /files/presign`, `POST /files/complete`, `/graphql`)
-- structured audit logging added for critical events
-- GraphQL playground disabled in production
-- DB query logging is disabled by default unless `DB_LOG_QUERIES=true`
-
-### Critical events currently audited
-- suspicious auth events (`auth.missing_user_header`, `auth.invalid_role_header`)
-- order creation (`orders.create.accepted`, `orders.create.reused`, `orders.create.failed`)
-- file write/read flows (`files.presign.*`, `files.complete.*`, `files.read_url.*`)
-- rate-limit denials (`abuse.rate_limit_exceeded`)
-
-### Verification quick checks
-#### 1) Headers
-```bash
-curl -i http://localhost:8080/orders   -H 'x-user-id: 00000000-0000-0000-0000-000000000001'
-```
-Check for:
-- `x-request-id`
-- `x-correlation-id`
-- `x-content-type-options: nosniff`
-- `x-frame-options: DENY`
-- `referrer-policy: no-referrer`
-- `ratelimit-policy`
-- `ratelimit-limit`
-- `ratelimit-remaining`
-
-#### 2) Strict rate limit
-```bash
-for i in $(seq 1 12); do
-  curl -s -o /dev/null -w '%{http_code}
-'     -X POST http://localhost:8080/orders     -H 'Content-Type: application/json'     -H 'Idempotency-Key: demo-key-'"$i"     -H 'x-user-id: 00000000-0000-0000-0000-000000000001'     -d '{"items":[{"productId":"11111111-1111-1111-1111-111111111111","quantity":1}]}'
-done
-```
-Expected: after the strict budget is exhausted you get `429`.
-
-#### 3) Audit logging
-```bash
-docker compose logs -f api
-```
-In another shell trigger:
-```bash
-curl -i http://localhost:8080/files/some-id
-```
-Expected audit event: `auth.missing_user_header`
-
-### Security homework deliverables
-See:
-- `security-homework/SECURITY-BASELINE.md`
-- `security-homework/secret-flow-note.md`
-- `security-homework/tls-note.md`
-- `security-homework/security-evidence/*`
-
-### Notes
-- DEV auth via `x-user-id` / `x-user-role` is still only a training setup.
-- Production target state should replace this with JWT/session auth, centralized secret delivery, and edge TLS termination.
+<img width="1487" height="568" alt="image" src="https://github.com/user-attachments/assets/83260664-a873-42e7-8481-f60e264b62fe" />
+ 
+4. successful production deploy https://github.com/popilmv/nest-projject/actions/runs/24397122507 <img width="1430" height="590" alt="image" src="https://github.com/user-attachments/assets/aed90e26-3d42-4ff3-86f7-21dc76750fda" />
 

@@ -1,9 +1,6 @@
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  RequestMethod,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -50,13 +47,7 @@ import { AppService } from './app.service';
     AppGraphqlModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    RequestIdMiddleware,
-    SecurityHeadersMiddleware,
-    DefaultRateLimitMiddleware,
-    StrictRateLimitMiddleware,
-  ],
+  providers: [AppService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
