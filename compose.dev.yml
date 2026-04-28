@@ -18,14 +18,17 @@ services:
 
   api:
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     build:
       context: .
       target: dev
     env_file:
       - .env
     environment:
+      NODE_ENV: development
       DB_HOST: postgres
       DB_PORT: 5432
       CHOKIDAR_USEPOLLING: "true"
@@ -43,6 +46,7 @@ services:
     env_file:
       - .env
     environment:
+      NODE_ENV: development
       DB_HOST: postgres
       DB_PORT: 5432
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
@@ -52,5 +56,7 @@ services:
       - .:/app
       - /app/node_modules
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy

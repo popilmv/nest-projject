@@ -21,6 +21,8 @@ import { DefaultRateLimitMiddleware } from './common/security/default-rate-limit
 import { StrictRateLimitMiddleware } from './common/security/strict-rate-limit.middleware';
 import { SecurityHeadersMiddleware } from './common/security/security-headers.middleware';
 import { CommonModule } from './common/common.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -37,7 +39,8 @@ import { CommonModule } from './common/common.module';
         process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
       entities: [User, Product, Order, OrderItem, ProcessedMessage, FileRecord],
       synchronize: true,
-      logging: process.env.DB_LOG_QUERIES === 'true' ? ['query', 'error'] : ['error'],
+      logging:
+        process.env.DB_LOG_QUERIES === 'true' ? ['query', 'error'] : ['error'],
     }),
 
     CommonModule,
@@ -46,7 +49,9 @@ import { CommonModule } from './common/common.module';
     FilesModule,
     AppGraphqlModule,
   ],
+  controllers: [AppController],
   providers: [
+    AppService,
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
     DefaultRateLimitMiddleware,
@@ -56,7 +61,11 @@ import { CommonModule } from './common/common.module';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
-      .apply(RequestIdMiddleware, SecurityHeadersMiddleware, DefaultRateLimitMiddleware)
+      .apply(
+        RequestIdMiddleware,
+        SecurityHeadersMiddleware,
+        DefaultRateLimitMiddleware,
+      )
       .forRoutes({ path: '*', method: RequestMethod.ALL });
 
     consumer

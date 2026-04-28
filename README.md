@@ -424,7 +424,7 @@ curl -X POST http://localhost:3000/files/complete \
 
 This repo supports:
 
-- **prod-like** local run (API + Postgres) via `compose.yml`
+- **prod-like** local run (API + Postgres + RabbitMQ + worker) via `compose.yml`
 - **dev** run with hot reload & bind-mount via `compose.dev.yml`
 - multi-stage **Dockerfile targets**: `dev`, `build`, `prod`, `prod-distroless`
 - DB jobs as **one-off containers**: `migrate` and `seed`
@@ -432,10 +432,10 @@ This repo supports:
 ### Files added
 
 - `Dockerfile` — multi-stage build (dev/build/prod/prod-distroless)
-- `compose.yml` — prod-like stack (API + Postgres + jobs)
-- `compose.dev.yml` — dev override (hot reload + bind mount)
+- `compose.yml` — prod-like stack (API + Postgres + RabbitMQ + worker + jobs); runtime services explicitly use `NODE_ENV=production`
+- `compose.dev.yml` — dev override (hot reload + bind mount); API/worker wait for healthy Postgres and RabbitMQ
 - `.dockerignore` — excludes `node_modules`, `dist`, `.git`, `.env`, logs, etc.
-- `.env.example` — example env (no secrets)
+- `.env.example` — example env (no secrets), defaulted for prod-like compose; dev compose overrides `NODE_ENV=development`
 
 ### 1) Setup env
 
@@ -454,13 +454,15 @@ docker-compose -f compose.yml -f compose.dev.yml up --build
 ```
 
 - API: http://localhost:8080
-- Postgres: **not exposed** (no `ports:`), only available on the internal network.
+- Postgres: exposed on `${POSTGRES_PORT:-5432}` for local debugging in dev override.
+- RabbitMQ waits on healthcheck before API/worker start, avoiding early `ECONNREFUSED`.
 
 ### 3) Prod-like local run
 
 ```bash
 docker-compose -f compose.yml up --build
 ```
+This uses `NODE_ENV=production` for runtime containers even if `.env` was copied from `.env.example`. In production mode GraphQL uses in-memory schema generation, so the non-root runtime does not need to write `schema.gql`.
 
 ### 4) Run DB jobs (one-off containers)
 
@@ -805,7 +807,7 @@ Recommended labels:
 
 ## Health checks used by pipeline
 
-Added endpoints:
+Added endpoints and registered them in `AppModule` through `AppController`:
 
 - `GET /health`
 - `GET /ready`
