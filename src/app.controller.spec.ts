@@ -6,13 +6,19 @@ describe('AppController', () => {
   let appController: AppController;
 
   const appServiceMock = {
-    getHello: jest.fn(() => 'Hello World!'),
+    getHello: jest.fn(() => 'Orders API is running'),
     getHealth: jest.fn(() => ({ status: 'ok', service: 'orders-api' })),
     getReadiness: jest.fn(() =>
       Promise.resolve({
         status: 'ready',
         service: 'orders-api',
         checks: { database: 'ok' },
+      }),
+    ),
+    getMetrics: jest.fn(() =>
+      Promise.resolve({
+        service: 'orders-api',
+        metrics: { ordersByStatus: {}, processedMessages: 0 },
       }),
     ),
   };
@@ -32,8 +38,8 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return service banner', () => {
+      expect(appController.getHello()).toBe('Orders API is running');
     });
 
     it('should return health payload', () => {
@@ -48,6 +54,13 @@ describe('AppController', () => {
         status: 'ready',
         service: 'orders-api',
         checks: { database: 'ok' },
+      });
+    });
+
+    it('should return metrics payload', async () => {
+      await expect(appController.getMetrics()).resolves.toEqual({
+        service: 'orders-api',
+        metrics: { ordersByStatus: {}, processedMessages: 0 },
       });
     });
   });

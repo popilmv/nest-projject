@@ -21,9 +21,9 @@ type OrderItem {
 }
 
 enum OrderStatus {
-  CANCELLED
-  CREATED
-  PAID
+  FAILED
+  PENDING
+  PROCESSED
 }
 
 input OrdersFilterInput {

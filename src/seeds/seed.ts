@@ -1,7 +1,11 @@
 import 'dotenv/config';
 import { AppDataSource } from '../database/data-source';
-import { User } from '../modules/users/user.entity';
 import { Product } from '../modules/products/product.entity';
+import { User } from '../modules/users/user.entity';
+
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+const PRODUCT_A_ID = '10000000-0000-0000-0000-000000000001';
+const PRODUCT_B_ID = '10000000-0000-0000-0000-000000000002';
 
 async function run() {
   await AppDataSource.initialize();
@@ -9,30 +13,38 @@ async function run() {
   const userRepo = AppDataSource.getRepository(User);
   const productRepo = AppDataSource.getRepository(Product);
 
-  // user seed (upsert по email)
-  await userRepo
-    .createQueryBuilder()
-    .insert()
-    .into(User)
-    .values([{ email: 'demo@mail.com' }])
-    .orIgnore() // relies on UNIQUE(email)
-    .execute();
+  await userRepo.save(
+    userRepo.create({
+      id: DEMO_USER_ID,
+      email: 'demo@mail.com',
+    }),
+  );
+
   const products = [
-    { title: 'Product A', price: '10.00', stock: 5 },
-    { title: 'Product B', price: '25.50', stock: 2 },
+    {
+      id: PRODUCT_A_ID,
+      title: 'Product A',
+      price: '10.00',
+      stock: 5,
+      imageFileId: null,
+    },
+    {
+      id: PRODUCT_B_ID,
+      title: 'Product B',
+      price: '25.50',
+      stock: 2,
+      imageFileId: null,
+    },
   ];
 
-  for (const p of products) {
-    // робимо idempotent seed через "insert if not exists"
-    // для цього бажано мати UNIQUE(title) — якщо хочеш, додай unique в entity і regeneration migration
-    const exists = await productRepo.findOne({ where: { title: p.title } });
-    if (!exists) {
-      await productRepo.save(productRepo.create(p));
-    }
+  for (const product of products) {
+    await productRepo.save(productRepo.create(product));
   }
 
   await AppDataSource.destroy();
   console.log('Seed done');
+  console.log(`Demo user id: ${DEMO_USER_ID}`);
+  console.log(`Demo product ids: ${PRODUCT_A_ID}, ${PRODUCT_B_ID}`);
 }
 
 run().catch((e) => {

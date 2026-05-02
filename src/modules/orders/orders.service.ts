@@ -1,22 +1,8 @@
-type PgError = {
-  code?: string;
-};
-
-function isPgError(error: unknown): error is PgError {
-  return typeof error === 'object' && error !== null && 'code' in error;
-}
-import { Injectable } from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
+import { Injectable, Logger } from '@nestjs/common';
 import * as grpc from '@grpc/grpc-js';
-import {
-  RabbitService,
-  OrdersProcessMessage,
-} from '../../rabbit/rabbit.service';
-import { DataSource, In } from 'typeorm';
-import { CreateOrderDto } from './dto/create-order.dto';
-import { Order } from './order.entity';
-import { OrderItem } from './order-item.entity';
-import { Product } from '../products/product.entity';
+import { v4 as uuidv4 } from 'uuid';
+import { DataSource } from 'typeorm';
+import type { RequestUser } from '../../common/auth/user.types';
 import {
   BadRequestError,
   ConflictError,
@@ -24,7 +10,25 @@ import {
   NotFoundError,
   ServiceUnavailableError,
 } from '../../common/errors/http-exception';
+import {
+  OrdersProcessMessage,
+  RabbitService,
+} from '../../rabbit/rabbit.service';
 import { PaymentsClient } from '../payments-client/payments.client';
+import { Product } from '../products/product.entity';
+import { User } from '../users/user.entity';
+import { CreateOrderDto } from './dto/create-order.dto';
+import { Order } from './order.entity';
+import { OrderItem } from './order-item.entity';
+import { buildOrderPlan } from './order-policy';
+
+type PgError = {
+  code?: string;
+};
+
+function isPgError(error: unknown): error is PgError {
+  return typeof error === 'object' && error !== null && 'code' in error;
+}
 
 type FindOrdersArgs = {
   filter?: {
@@ -40,6 +44,8 @@ type FindOrdersArgs = {
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly rabbit: RabbitService,
@@ -81,48 +87,72 @@ export class OrdersService {
     return qb.getMany();
   }
 
-  async createOrder(dto: CreateOrderDto, idempotencyKey: string) {
-    if (!idempotencyKey) {
-      throw new BadRequestError('Idempotency-Key header is required');
+  async getOrder(actor: RequestUser, orderId: string): Promise<Order> {
+    const order = await this.dataSource.getRepository(Order).findOne({
+      where:
+        actor.role === 'admin'
+          ? { id: orderId }
+          : { id: orderId, userId: actor.id },
+      relations: {
+        items: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundError('Order not found or access denied', { orderId });
     }
 
-    if (!dto.userId) {
-      throw new BadRequestError('userId is required');
+    this.logger.log({
+      event: 'order_read',
+      orderId: order.id,
+      userId: actor.id,
+      role: actor.role,
+      status: order.status,
+    });
+
+    return order;
+  }
+
+  async createOrder(
+    actor: RequestUser,
+    dto: CreateOrderDto,
+    idempotencyKey: string,
+  ) {
+    if (!idempotencyKey) {
+      throw new BadRequestError('Idempotency-Key header is required');
     }
 
     if (!dto.items?.length) {
       throw new BadRequestError('items must be a non-empty array');
     }
 
-    for (const it of dto.items) {
-      if (!it.productId) {
-        throw new BadRequestError('productId is required', { item: it });
-      }
-
-      if (!Number.isInteger(it.quantity) || it.quantity <= 0) {
-        throw new BadRequestError('quantity must be positive int', {
-          item: it,
-        });
-      }
-    }
-
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
-
-    let txCommitted = false;
+    await qr.startTransaction();
 
     try {
-      await qr.startTransaction();
+      const user = await qr.manager.findOne(User, {
+        where: { id: actor.id },
+      });
 
-      // 1) idempotency
+      if (!user) {
+        throw new NotFoundError('Authenticated user was not found', {
+          userId: actor.id,
+        });
+      }
+
       const existing = await qr.manager.findOne(Order, {
-        where: { userId: dto.userId, idempotencyKey },
-        relations: { items: false },
+        where: { userId: actor.id, idempotencyKey },
+        relations: { items: true },
       });
 
       if (existing) {
         await qr.commitTransaction();
-        txCommitted = true;
+        this.logger.log({
+          event: 'order_idempotency_reused',
+          orderId: existing.id,
+          userId: actor.id,
+        });
 
         return {
           reused: true,
@@ -137,59 +167,67 @@ export class OrdersService {
         };
       }
 
-      // 2) validate products exist
-      const productIds = dto.items.map((i) => i.productId);
-      const products = await qr.manager.findBy(Product, { id: In(productIds) });
+      const productIds = [...new Set(dto.items.map((item) => item.productId))];
+      const products = await qr.manager
+        .createQueryBuilder(Product, 'product')
+        .where('product.id IN (:...productIds)', { productIds })
+        .setLock('pessimistic_write')
+        .getMany();
 
-      if (products.length !== new Set(productIds).size) {
-        const found = new Set(products.map((p) => p.id));
-        const missing = productIds.filter((id) => !found.has(id));
-        throw new NotFoundError('Some products not found', { missing });
+      const plan = buildOrderPlan(products, dto.items);
+      const productsById = new Map(
+        products.map((product) => [product.id, product]),
+      );
+
+      for (const [productId, requestedQuantity] of plan.quantityByProductId) {
+        const product = productsById.get(productId)!;
+        product.stock -= requestedQuantity;
+        await qr.manager.save(Product, product);
       }
 
-      const byId = new Map(products.map((p) => [p.id, p]));
-      const amountCents = dto.items.reduce((sum, it) => {
-        const p = byId.get(it.productId)!;
-        return sum + Number(p.price) * it.quantity;
-      }, 0);
-
-      // 3) create order
       const order = qr.manager.create(Order, {
-        userId: dto.userId,
+        userId: actor.id,
         idempotencyKey,
         status: 'pending',
       });
 
       await qr.manager.save(order);
 
-      // 4) create items
-      for (const it of dto.items) {
-        const p = byId.get(it.productId)!;
-
+      for (const itemInput of dto.items) {
+        const product = productsById.get(itemInput.productId)!;
         const item = qr.manager.create(OrderItem, {
-          orderId: order.id,
-          productId: p.id,
-          quantity: it.quantity,
-          priceAtPurchase: p.price,
+          order,
+          product,
+          quantity: itemInput.quantity,
+          priceAtPurchase: product.price,
         });
 
         await qr.manager.save(item);
       }
 
       await qr.commitTransaction();
-      txCommitted = true;
+      this.logger.log({
+        event: 'order_created',
+        orderId: order.id,
+        userId: actor.id,
+        amountCents: plan.amountCents,
+        status: order.status,
+      });
 
       let payment: { payment_id: string; status: string };
       try {
         payment = await this.paymentsClient.authorize({
           orderId: order.id,
-          amountCents,
-          currency: 'USD',
+          amountCents: plan.amountCents,
+          currency: process.env.PAYMENTS_CURRENCY ?? 'USD',
           idempotencyKey,
         });
       } catch (error: unknown) {
-        await this.dataSource.getRepository(Order).update(order.id, {
-          status: 'failed',
+        await this.failOrderAndReleaseStock(order.id);
+        this.logger.error({
+          event: 'order_payment_failed',
+          orderId: order.id,
+          userId: actor.id,
         });
         this.handlePaymentsRpcError(error);
       }
@@ -202,7 +240,6 @@ export class OrdersService {
       order.paymentId = payment.payment_id;
       order.paymentStatus = payment.status;
 
-      // 5) publish to RabbitMQ AFTER commit + successful payment auth
       const messageId = uuidv4();
       const msg: OrdersProcessMessage = {
         messageId,
@@ -219,15 +256,23 @@ export class OrdersService {
         correlationId: msg.correlationId,
       });
 
+      this.logger.log({
+        event: 'order_processing_enqueued',
+        orderId: order.id,
+        messageId,
+        routingKey: this.rabbit.rkProcess,
+      });
+
       return { reused: false, order, payment, messageId };
     } catch (e: unknown) {
-      if (!txCommitted) {
+      if (qr.isTransactionActive) {
         await qr.rollbackTransaction();
       }
 
       if (isPgError(e) && e.code === '23505') {
         const order = await this.dataSource.getRepository(Order).findOne({
-          where: { userId: dto.userId, idempotencyKey },
+          where: { userId: actor.id, idempotencyKey },
+          relations: { items: true },
         });
 
         if (order) {
@@ -251,6 +296,38 @@ export class OrdersService {
     } finally {
       await qr.release();
     }
+  }
+
+  private async failOrderAndReleaseStock(orderId: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, {
+        where: { id: orderId },
+        relations: {
+          items: {
+            product: true,
+          },
+        },
+      });
+
+      if (!order || order.status === 'failed') {
+        return;
+      }
+
+      order.status = 'failed';
+      await manager.save(Order, order);
+
+      for (const item of order.items ?? []) {
+        const productId = item.product?.id ?? item.productId;
+        if (productId) {
+          await manager.increment(
+            Product,
+            { id: productId },
+            'stock',
+            item.quantity,
+          );
+        }
+      }
+    });
   }
 
   private handlePaymentsRpcError(error: unknown): never {

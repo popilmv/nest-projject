@@ -1,18 +1,19 @@
-import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { HttpLoggingMiddleware } from './common/logging/http-logging.middleware';
+import { FileRecord } from './modules/files/entities/file-record.entity';
+import { FilesModule } from './modules/files/files.module';
+import { OrderItem } from './modules/orders/order-item.entity';
+import { Order } from './modules/orders/order.entity';
 import { OrdersModule } from './modules/orders/orders.module';
+import { ProcessedMessage } from './modules/orders/processed-message.entity';
+import { Product } from './modules/products/product.entity';
+import { User } from './modules/users/user.entity';
 import { RabbitModule } from './rabbit/rabbit.module';
 import { AppGraphqlModule } from './graphql/graphql.module';
-import { User } from './modules/users/user.entity';
-import { Product } from './modules/products/product.entity';
-import { Order } from './modules/orders/order.entity';
-import { OrderItem } from './modules/orders/order-item.entity';
-import { ProcessedMessage } from './modules/orders/processed-message.entity';
-import { FilesModule } from './modules/files/files.module';
-import { FileRecord } from './modules/files/entities/file-record.entity';
 
 @Module({
   imports: [
@@ -29,7 +30,7 @@ import { FileRecord } from './modules/files/entities/file-record.entity';
         process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
       entities: [User, Product, Order, OrderItem, ProcessedMessage, FileRecord],
       synchronize: true,
-      logging: ['query'],
+      logging: process.env.TYPEORM_LOGGING === 'true' ? ['query'] : false,
     }),
 
     RabbitModule,
@@ -40,4 +41,8 @@ import { FileRecord } from './modules/files/entities/file-record.entity';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(HttpLoggingMiddleware).forRoutes('*');
+  }
+}

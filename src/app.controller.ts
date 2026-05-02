@@ -19,4 +19,9 @@ export class AppController {
   getReadiness() {
     return this.appService.getReadiness();
   }
+
+  @Get('metrics')
+  getMetrics() {
+    return this.appService.getMetrics();
+  }
 }

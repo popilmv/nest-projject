@@ -2,9 +2,9 @@ import { registerEnumType } from '@nestjs/graphql';
 
 // Must match values stored in DB (see Order.entity.ts)
 export enum GqlOrderStatus {
-  CREATED = 'created',
-  PAID = 'paid',
-  CANCELLED = 'cancelled',
+  PENDING = 'pending',
+  PROCESSED = 'processed',
+  FAILED = 'failed',
 }
 
 registerEnumType(GqlOrderStatus, { name: 'OrderStatus' });

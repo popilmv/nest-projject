@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-class CreateOrderItemDto {
+export class CreateOrderItemDto {
   @IsString()
   @IsNotEmpty()
   productId: string;
@@ -21,10 +21,6 @@ class CreateOrderItemDto {
 }
 
 export class CreateOrderDto {
-  @IsString()
-  @IsNotEmpty()
-  userId: string;
-
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

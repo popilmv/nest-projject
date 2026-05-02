@@ -24,12 +24,16 @@ type AuthorizeResponse = {
   status: PaymentStatus;
 };
 
+type PaymentsAuthorizeFn = (
+  req: AuthorizeRequest,
+  meta: grpc.Metadata | undefined,
+  options: grpc.CallOptions,
+  cb: (err: grpc.ServiceError | null, res?: AuthorizeResponse) => void,
+) => void;
+
 type PaymentsServiceClient = {
-  Authorize(
-    req: AuthorizeRequest,
-    options: grpc.CallOptions,
-    cb: (err: grpc.ServiceError | null, res?: AuthorizeResponse) => void,
-  ): void;
+  authorize?: PaymentsAuthorizeFn;
+  Authorize?: PaymentsAuthorizeFn;
 };
 
 type PaymentsGrpcPackage = {
@@ -63,6 +67,7 @@ export class PaymentsClient {
     const grpcObj = grpc.loadPackageDefinition(
       pkgDef,
     ) as unknown as PaymentsGrpcPackage;
+
     const paymentsV1 = grpcObj.payments.v1;
 
     this.client = new paymentsV1.PaymentsService(
@@ -80,6 +85,7 @@ export class PaymentsClient {
     const timeoutMs = Number(
       this.config.get<string>('PAYMENTS_GRPC_TIMEOUT_MS') || '800',
     );
+
     const deadline = new Date(Date.now() + timeoutMs);
 
     const req: AuthorizeRequest = {
@@ -90,10 +96,27 @@ export class PaymentsClient {
     };
 
     return await new Promise<AuthorizeResponse>((resolve, reject) => {
-      this.client.Authorize(req, { deadline }, (err, res) => {
-        if (err) return reject(err);
-        resolve(res as AuthorizeResponse);
-      });
+      const authorizeMethod = this.client.authorize ?? this.client.Authorize;
+
+      if (!authorizeMethod) {
+        return reject(new Error('Payments gRPC authorize method is unavailable'));
+      }
+
+      authorizeMethod.call(
+        this.client,
+        req,
+        undefined,
+        { deadline },
+        (err, res) => {
+          if (err) return reject(err);
+
+          if (!res) {
+            return reject(new Error('Payments gRPC authorize returned empty response'));
+          }
+
+          resolve(res);
+        },
+      );
     });
   }
 }

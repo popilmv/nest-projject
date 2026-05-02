@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from '../modules/users/user.entity';
-import { Product } from '../modules/products/product.entity';
-import { Order } from '../modules/orders/order.entity';
+import { FileRecord } from '../modules/files/entities/file-record.entity';
 import { OrderItem } from '../modules/orders/order-item.entity';
+import { Order } from '../modules/orders/order.entity';
 import { ProcessedMessage } from '../modules/orders/processed-message.entity';
+import { Product } from '../modules/products/product.entity';
+import { User } from '../modules/users/user.entity';
 import { RabbitModule } from '../rabbit/rabbit.module';
 import { OrdersWorker } from './orders.worker';
 
@@ -22,9 +23,9 @@ import { OrdersWorker } from './orders.worker';
       database: process.env.DB_NAME,
       ssl:
         process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-      entities: [User, Product, Order, OrderItem, ProcessedMessage],
+      entities: [User, Product, Order, OrderItem, ProcessedMessage, FileRecord],
       synchronize: true,
-      logging: ['query'],
+      logging: process.env.TYPEORM_LOGGING === 'true' ? ['query'] : false,
     }),
 
     RabbitModule,

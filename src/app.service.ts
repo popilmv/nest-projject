@@ -1,12 +1,14 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { Order } from './modules/orders/order.entity';
+import { ProcessedMessage } from './modules/orders/processed-message.entity';
 
 @Injectable()
 export class AppService {
   constructor(private readonly dataSource: DataSource) {}
 
   getHello(): string {
-    return 'Hello World!';
+    return 'Orders API is running';
   }
 
   getHealth() {
@@ -38,5 +40,34 @@ export class AppService {
         },
       });
     }
+  }
+
+  async getMetrics() {
+    const orderStatusRows = await this.dataSource
+      .getRepository(Order)
+      .createQueryBuilder('orders')
+      .select('orders.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('orders.status')
+      .getRawMany<{ status: string; count: string }>();
+
+    const processedMessages = await this.dataSource
+      .getRepository(ProcessedMessage)
+      .count();
+
+    return {
+      service: 'orders-api',
+      metrics: {
+        ordersByStatus: orderStatusRows.reduce<Record<string, number>>(
+          (acc, row) => {
+            acc[row.status] = Number(row.count);
+            return acc;
+          },
+          {},
+        ),
+        processedMessages,
+      },
+      timestamp: new Date().toISOString(),
+    };
   }
 }

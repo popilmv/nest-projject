@@ -38,11 +38,14 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
+      PAYMENTS_GRPC_URL: payments:50051
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      payments:
+        condition: service_started
     ports:
       - "8080:3000"
     networks:
@@ -59,11 +62,14 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
+      PAYMENTS_GRPC_URL: payments:50051
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      payments:
+        condition: service_started
     ports:
       - "8081:3000"
     networks:
@@ -100,6 +106,7 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
+      PAYMENTS_GRPC_URL: payments:50051
     depends_on:
       postgres:
         condition: service_healthy
@@ -120,6 +127,7 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
+      PAYMENTS_GRPC_URL: payments:50051
     depends_on:
       migrate:
         condition: service_completed_successfully
